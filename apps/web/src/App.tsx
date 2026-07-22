@@ -29,6 +29,7 @@ import type {
 
 import { BoardRenderer } from './board/board-renderer';
 import {
+  AffinityToken,
   CategoryToken,
   ResourceList,
   ResourceToken,
@@ -100,25 +101,50 @@ function totalScore(state: GameState, player: PlayerState): number {
   );
 }
 
-function describeRequirement(requirement: PlacementRequirement): string {
-  const parts: string[] = [];
-  if (requirement.minimumValue)
-    parts.push(`value ${requirement.minimumValue}+`);
-  if (requirement.affinities?.length)
-    parts.push(requirement.affinities.join(' or '));
-  const costs = Object.entries(requirement.cost ?? {});
-  if (costs.length)
-    parts.push(
-      `pay ${costs.map(([resource, amount]) => `${amount} ${resource}`).join(', ')}`,
-    );
-  return parts.length ? parts.join(' · ') : 'any ready die';
-}
-
 function isLowRollFriendly(requirement: PlacementRequirement): boolean {
   return (
     (requirement.minimumValue ?? 1) <= 2 &&
     !requirement.affinities?.length &&
     Object.keys(requirement.cost ?? {}).length === 0
+  );
+}
+
+function RequirementTokens({
+  requirement,
+}: {
+  readonly requirement: PlacementRequirement;
+}) {
+  const hasMinimum = requirement.minimumValue !== undefined;
+  const hasAffinities = Boolean(requirement.affinities?.length);
+  const hasCost = Object.keys(requirement.cost ?? {}).length > 0;
+  if (!hasMinimum && !hasAffinities && !hasCost)
+    return <span className="cost-free">Any ready die</span>;
+
+  return (
+    <span className="requirement-tokens">
+      {hasMinimum && (
+        <span
+          aria-label={`Minimum value ${requirement.minimumValue}. The rolled die value must be this number or higher.`}
+          className="info-token value-token compact-token"
+          data-tooltip={`Minimum value: die must roll ${requirement.minimumValue}+.`}
+          tabIndex={0}
+        >
+          <span aria-hidden="true" className="token-icon">
+            ⚄
+          </span>
+          <strong>{requirement.minimumValue}+</strong>
+        </span>
+      )}
+      {requirement.affinities?.map((affinity) => (
+        <AffinityToken affinity={affinity} compact key={affinity} />
+      ))}
+      {hasCost && (
+        <>
+          <span className="requirement-cost-label">Pay</span>
+          <ResourceList values={requirement.cost ?? {}} />
+        </>
+      )}
+    </span>
   );
 }
 
@@ -534,8 +560,8 @@ export function App() {
                     (location) => location.isActive !== false,
                   ).length
                 }{' '}
-                regions are open this round. Click a glowing location or drag a
-                die onto it.
+                regions are open this round. Click a location to pin its
+                details; select a die to place on glowing routes.
               </span>
               <span>Board rendered with PixiJS</span>
             </div>
@@ -889,7 +915,11 @@ export function App() {
                                   : '× BLOCKED'
                                 : `SLOT ${index + 1}`}
                             </strong>
-                            <span>{describeRequirement(slot.requirement)}</span>
+                            <span>
+                              <RequirementTokens
+                                requirement={slot.requirement}
+                              />
+                            </span>
                             {validation && (
                               <em>
                                 {validation.legal
@@ -904,7 +934,8 @@ export function App() {
                   </>
                 ) : (
                   <p>
-                    Hover a location to inspect its reward and restrictions.
+                    Hover or click a location to inspect its reward and
+                    restrictions.
                   </p>
                 )}
               </section>

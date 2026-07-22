@@ -1,10 +1,11 @@
 import type {
   CardCategory,
+  DieAffinity,
   ResourcePool,
   ResourceType,
 } from '@shattered-crown/shared-types';
 
-import { CATEGORY_INFO, RESOURCE_INFO } from './rules-info';
+import { AFFINITY_INFO, CATEGORY_INFO, RESOURCE_INFO } from './rules-info';
 
 interface ResourceTokenProps {
   readonly resource: ResourceType | 'victoryPoints';
@@ -79,6 +80,29 @@ export function CategoryToken({
       tabIndex={0}
     >
       <span aria-hidden="true">{info.icon}</span> {info.label}
+    </span>
+  );
+}
+
+export function AffinityToken({
+  affinity,
+  compact = false,
+}: {
+  readonly affinity: DieAffinity;
+  readonly compact?: boolean;
+}) {
+  const info = AFFINITY_INFO[affinity];
+  return (
+    <span
+      aria-label={`${info.label}. ${info.description}`}
+      className={`info-token affinity-token affinity-${affinity}${compact ? ' compact-token' : ''}`}
+      data-tooltip={`${info.label}: ${info.description}`}
+      tabIndex={0}
+    >
+      <span aria-hidden="true" className="token-icon">
+        {info.icon}
+      </span>
+      {!compact && <span className="token-label">{info.label}</span>}
     </span>
   );
 }

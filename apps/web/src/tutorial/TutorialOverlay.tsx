@@ -53,8 +53,8 @@ const STEPS: readonly TutorialStep[] = [
     eyebrow: 'Plan before committing',
     title: 'Inspect rewards and restrictions',
     symbol: '☰',
-    body: 'Hover or focus a location to see its reward and both slot requirements. With a die selected, this panel explains why each slot is legal or blocked.',
-    tip: 'The keyboard placement list offers the same validated choices.',
+    body: 'Hover or click a location to pin its reward and slot requirements in this panel. With a die selected, the panel explains why each slot is legal or blocked.',
+    tip: 'The reward and requirement icons here have their own hover and keyboard-focus explanations.',
   },
   {
     anchor: 'cards',

@@ -247,11 +247,14 @@ export function BoardRenderer(props: BoardRendererProps) {
         contains: (x: number, y: number) =>
           x >= 0 && y >= 0 && x <= CARD_WIDTH && y <= CARD_HEIGHT,
       };
-      card.on('pointertap', () =>
-        placeRef.current(location.id, props.selectedDieId),
-      );
+      card.on('pointertap', () => {
+        if (props.selectedDieId) {
+          placeRef.current(location.id, props.selectedDieId);
+          return;
+        }
+        inspectRef.current(location.id);
+      });
       card.on('pointerover', () => inspectRef.current(location.id));
-      card.on('pointerout', () => inspectRef.current(null));
 
       const highlight = new Graphics()
         .roundRect(0, 0, CARD_WIDTH, CARD_HEIGHT, 18)
@@ -494,6 +497,16 @@ export function BoardRenderer(props: BoardRendererProps) {
         action.type === 'place-die' ? action.locationId : null,
       ),
   ).size;
+  const legalLocationsForSelected = new Set(
+    props.legalActions
+      .filter(
+        (action) =>
+          action.type === 'place-die' && action.dieId === props.selectedDieId,
+      )
+      .map((action) =>
+        action.type === 'place-die' ? action.locationId : null,
+      ),
+  );
   const activeLocationCount = props.game.locations.filter(
     (location) => location.isActive !== false,
   ).length;
@@ -524,6 +537,41 @@ export function BoardRenderer(props: BoardRendererProps) {
           style={tutorialHotspotStyle(forgePoint)}
         />
       )}
+      {props.game.locations.map((location, index) => {
+        const point = LOCATION_POINTS[index];
+        if (!point) return null;
+        const canPlace =
+          props.selectedDieId !== null &&
+          legalLocationsForSelected.has(location.id);
+        return (
+          <button
+            aria-label={
+              props.selectedDieId
+                ? `${canPlace ? 'Place at' : 'Inspect'} ${location.name}`
+                : `Inspect ${location.name}`
+            }
+            className="location-inspect-hotspot"
+            data-testid={`location-hotspot-${location.id}`}
+            key={location.id}
+            onClick={() => {
+              if (props.selectedDieId && canPlace) {
+                placeRef.current(location.id, props.selectedDieId);
+                return;
+              }
+              inspectRef.current(location.id);
+            }}
+            onFocus={() => inspectRef.current(location.id)}
+            onMouseEnter={() => inspectRef.current(location.id)}
+            style={tutorialHotspotStyle(point)}
+            title={
+              props.selectedDieId
+                ? `${canPlace ? 'Place at' : 'Inspect'} ${location.name}`
+                : `Inspect ${location.name}`
+            }
+            type="button"
+          />
+        );
+      })}
       <div className="placement-guide" aria-live="polite">
         {selectedDie ? (
           <>
@@ -546,7 +594,7 @@ export function BoardRenderer(props: BoardRendererProps) {
               {activeLocationCount} active regions · {openSlotCount} contested
               slots
             </strong>
-            <span>Select a die to reveal its routes</span>
+            <span>Hover or click a location to inspect it</span>
           </>
         )}
       </div>

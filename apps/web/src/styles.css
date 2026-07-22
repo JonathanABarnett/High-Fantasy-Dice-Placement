@@ -282,6 +282,24 @@ select {
 .resource-victoryPoints .token-icon {
   color: #ffe38a;
 }
+.affinity-arcane .token-icon {
+  color: #8db1ff;
+}
+.affinity-martial .token-icon {
+  color: #ed897b;
+}
+.affinity-nature .token-icon {
+  color: #8fdaa1;
+}
+.affinity-influence .token-icon {
+  color: #d57af1;
+}
+.affinity-neutral .token-icon {
+  color: #d8cfbc;
+}
+.value-token .token-icon {
+  color: #f1c66f;
+}
 .compact-token {
   padding: 0.15rem 0.28rem;
   background: #251f1a;
@@ -365,6 +383,20 @@ select {
   position: absolute;
   z-index: 2;
   pointer-events: none;
+}
+.location-inspect-hotspot {
+  position: absolute;
+  z-index: 2;
+  padding: 0;
+  border: 0;
+  border-radius: 0.65rem;
+  background: transparent;
+  cursor: help;
+}
+.location-inspect-hotspot:hover,
+.location-inspect-hotspot:focus-visible {
+  outline: 2px solid rgb(241 198 111 / 72%);
+  outline-offset: 3px;
 }
 .placement-guide {
   position: absolute;
@@ -762,6 +794,19 @@ select {
 }
 .slot-preview > span {
   color: #c1b49d;
+}
+.requirement-tokens {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+}
+.requirement-cost-label {
+  color: #756a59;
+  font-size: 0.56rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 .slot-preview.legal {
   border-color: #3c8e61;

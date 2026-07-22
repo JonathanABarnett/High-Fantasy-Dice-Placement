@@ -51,6 +51,34 @@ test('explains resources and clearly marks die placement routes', async ({
   await expect(guide).toContainText('Blocked');
 });
 
+test('pins location details and exposes preview icon explanations', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Start match' }).click();
+
+  await page.getByRole('button', { name: 'Inspect Crystal Cavern' }).click();
+
+  const preview = page.locator('.location-preview');
+  await expect(
+    preview.getByRole('heading', { name: 'Crystal Cavern' }),
+  ).toBeVisible();
+  await expect(preview.locator('.resource-mana').first()).toHaveAttribute(
+    'data-tooltip',
+    /Arcane power used by magical cards/i,
+  );
+  await expect(preview.locator('.value-token').first()).toHaveAttribute(
+    'data-tooltip',
+    /Minimum value/i,
+  );
+  await expect(preview.locator('.affinity-arcane').first()).toHaveAttribute(
+    'data-tooltip',
+    /Accepted by magical locations/i,
+  );
+  await page.locator('.die:not([disabled])').first().click();
+  await expect(preview).toContainText(/PLAYABLE|BLOCKED/);
+});
+
 test('guides a new player through the complete visual tutorial', async ({
   page,
 }) => {
@@ -126,7 +154,7 @@ test('unlocks Forge Hall and permanently upgrades a die face', async ({
   await page.getByRole('button', { name: 'Start match' }).click();
   await page.locator('.die:not([disabled])').first().click();
   await page.getByText('Keyboard placement options').click();
-  await page.getByRole('button', { name: 'Forge Hall' }).click();
+  await page.getByRole('button', { exact: true, name: 'Forge Hall' }).click();
   const forgePanel = page.getByRole('region', { name: 'Forge upgrades' });
   await expect(forgePanel).toBeVisible();
   const forgeButton = forgePanel.getByRole('button', { name: 'Forge' }).first();
