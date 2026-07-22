@@ -1,0 +1,26 @@
+{
+  "name": "@shattered-crown/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@shattered-crown/game-content": "workspace:*",
+    "@shattered-crown/game-ai": "workspace:*",
+    "@shattered-crown/game-engine": "workspace:*",
+    "@shattered-crown/shared-types": "workspace:*",
+    "@vitejs/plugin-react": "^5.0.2",
+    "pixi.js": "^8.12.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9"
+  }
+}
