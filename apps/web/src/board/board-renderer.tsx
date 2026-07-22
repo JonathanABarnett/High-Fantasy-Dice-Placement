@@ -24,6 +24,7 @@ const BOARD_WIDTH = 1200;
 const BOARD_HEIGHT = 760;
 const CARD_WIDTH = 250;
 const CARD_HEIGHT = 154;
+const SLOT_SIZE = 38;
 
 interface BoardPoint {
   readonly x: number;
@@ -369,10 +370,10 @@ export function BoardRenderer(props: BoardRendererProps) {
       card.addChild(rewards);
 
       location.slots.forEach((slot, slotIndex) => {
-        const x = 15 + slotIndex * 70;
+        const x = 15 + slotIndex * 48;
         const slotOpen = slot.isOpen !== false;
         const slotLegal = slotOpen && legalSlotIds.has(slot.id);
-        const die = new Graphics().roundRect(x, 123, 61, 24, 7);
+        const die = new Graphics().roundRect(x, 113, SLOT_SIZE, SLOT_SIZE, 7);
         if (!slotOpen) {
           die
             .fill({ color: 0x0c0b0a, alpha: 0.9 })
@@ -382,12 +383,12 @@ export function BoardRenderer(props: BoardRendererProps) {
             style: {
               fill: 0xa9a39a,
               fontFamily: 'Arial',
-              fontSize: 9,
+              fontSize: 7,
               fontWeight: 'bold',
             },
           });
           sealed.anchor.set(0.5);
-          sealed.position.set(x + 30, 135);
+          sealed.position.set(x + SLOT_SIZE / 2, 132);
           card.addChild(die, sealed);
         } else if (slot.occupantDieId) {
           const human = slot.occupantPlayerId === props.humanPlayerId;
@@ -404,7 +405,7 @@ export function BoardRenderer(props: BoardRendererProps) {
             },
           });
           owner.anchor.set(0.5);
-          owner.position.set(x + 30, 135);
+          owner.position.set(x + SLOT_SIZE / 2, 132);
           card.addChild(die, owner);
         } else {
           die.fill({ color: 0x171511, alpha: 0.7 }).stroke({
@@ -425,12 +426,12 @@ export function BoardRenderer(props: BoardRendererProps) {
                   : 0xd99588
                 : 0xd6bd8f,
               fontFamily: 'Arial',
-              fontSize: 10,
+              fontSize: 9,
               fontWeight: 'bold',
             },
           });
           requirement.anchor.set(0.5);
-          requirement.position.set(x + 30, 135);
+          requirement.position.set(x + SLOT_SIZE / 2, 132);
           card.addChild(die, requirement);
         }
       });
