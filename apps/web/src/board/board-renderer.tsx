@@ -23,8 +23,11 @@ import boardMapUrl from '../../../../assets/generated/board/shattered-realms-map
 const BOARD_WIDTH = 1200;
 const BOARD_HEIGHT = 760;
 const CARD_WIDTH = 250;
-const CARD_HEIGHT = 154;
-const SLOT_SIZE = 38;
+const CARD_HEIGHT = 176;
+const SLOT_SIZE = 34;
+const SLOT_Y = 132;
+const SLOT_GAP = 44;
+const SLOT_CENTER_Y = SLOT_Y + SLOT_SIZE / 2;
 
 interface BoardPoint {
   readonly x: number;
@@ -335,7 +338,7 @@ export function BoardRenderer(props: BoardRendererProps) {
       }
 
       const plaque = new Graphics()
-        .roundRect(0, 82, CARD_WIDTH, 72, 13)
+        .roundRect(0, 86, CARD_WIDTH, 86, 13)
         .fill({ color: 0x130f0d, alpha: 0.86 })
         .stroke({
           color: legal ? 0x78efac : 0xd0a65d,
@@ -349,12 +352,14 @@ export function BoardRenderer(props: BoardRendererProps) {
         style: {
           fill: 0xffedc7,
           fontFamily: 'Georgia',
-          fontSize: 17,
+          fontSize: 16,
           fontWeight: 'bold',
           stroke: { color: 0x160f09, width: 3 },
+          wordWrap: true,
+          wordWrapWidth: 225,
         },
       });
-      name.position.set(11, 86);
+      name.position.set(12, 91);
       card.addChild(name);
 
       const rewards = new Text({
@@ -362,18 +367,24 @@ export function BoardRenderer(props: BoardRendererProps) {
         style: {
           fill: 0xe4bd72,
           fontFamily: 'Arial',
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: 'bold',
         },
       });
-      rewards.position.set(12, 106);
+      rewards.position.set(12, 114);
       card.addChild(rewards);
 
       location.slots.forEach((slot, slotIndex) => {
-        const x = 15 + slotIndex * 48;
+        const x = 15 + slotIndex * SLOT_GAP;
         const slotOpen = slot.isOpen !== false;
         const slotLegal = slotOpen && legalSlotIds.has(slot.id);
-        const die = new Graphics().roundRect(x, 113, SLOT_SIZE, SLOT_SIZE, 7);
+        const die = new Graphics().roundRect(
+          x,
+          SLOT_Y,
+          SLOT_SIZE,
+          SLOT_SIZE,
+          7,
+        );
         if (!slotOpen) {
           die
             .fill({ color: 0x0c0b0a, alpha: 0.9 })
@@ -383,12 +394,12 @@ export function BoardRenderer(props: BoardRendererProps) {
             style: {
               fill: 0xa9a39a,
               fontFamily: 'Arial',
-              fontSize: 7,
+              fontSize: 6.5,
               fontWeight: 'bold',
             },
           });
           sealed.anchor.set(0.5);
-          sealed.position.set(x + SLOT_SIZE / 2, 132);
+          sealed.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y);
           card.addChild(die, sealed);
         } else if (slot.occupantDieId) {
           const human = slot.occupantPlayerId === props.humanPlayerId;
@@ -405,7 +416,7 @@ export function BoardRenderer(props: BoardRendererProps) {
             },
           });
           owner.anchor.set(0.5);
-          owner.position.set(x + SLOT_SIZE / 2, 132);
+          owner.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y);
           card.addChild(die, owner);
         } else {
           die.fill({ color: 0x171511, alpha: 0.7 }).stroke({
@@ -426,12 +437,12 @@ export function BoardRenderer(props: BoardRendererProps) {
                   : 0xd99588
                 : 0xd6bd8f,
               fontFamily: 'Arial',
-              fontSize: 9,
+              fontSize: 8.5,
               fontWeight: 'bold',
             },
           });
           requirement.anchor.set(0.5);
-          requirement.position.set(x + SLOT_SIZE / 2, 132);
+          requirement.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y);
           card.addChild(die, requirement);
         }
       });
@@ -440,7 +451,7 @@ export function BoardRenderer(props: BoardRendererProps) {
         text: `${occupied}/${openSlots.length} slots`,
         style: { fill: 0xd6bd8f, fontFamily: 'Arial', fontSize: 10 },
       });
-      occupancy.position.set(202, 132);
+      occupancy.position.set(196, 149);
       card.addChild(occupancy);
       app.stage.addChild(card);
     });

@@ -368,8 +368,10 @@ select {
 }
 .pixi-board {
   position: relative;
+  width: min(100%, calc((100vh - 10.5rem) * 1200 / 760));
   aspect-ratio: 1200 / 760;
-  min-height: min(44rem, calc(100vh - 10rem));
+  min-height: 0;
+  margin: 0 auto;
   overflow: hidden;
   border-radius: 0.55rem;
   background:
@@ -379,8 +381,7 @@ select {
   display: block;
   width: 100% !important;
   max-width: none;
-  height: 100% !important;
-  object-fit: contain;
+  height: auto !important;
   touch-action: manipulation;
 }
 .tutorial-hotspot {
