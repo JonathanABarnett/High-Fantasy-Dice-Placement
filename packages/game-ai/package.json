@@ -14,6 +14,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@shattered-crown/game-content": "workspace:*",
     "@shattered-crown/game-engine": "workspace:*",
     "@shattered-crown/shared-types": "workspace:*"
   }

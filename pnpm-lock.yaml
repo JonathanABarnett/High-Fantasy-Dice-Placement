@@ -84,6 +84,9 @@ importers:
 
   packages/game-ai:
     dependencies:
+      '@shattered-crown/game-content':
+        specifier: workspace:*
+        version: link:../game-content
       '@shattered-crown/game-engine':
         specifier: workspace:*
         version: link:../game-engine
