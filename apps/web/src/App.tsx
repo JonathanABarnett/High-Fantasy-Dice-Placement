@@ -114,6 +114,14 @@ function describeRequirement(requirement: PlacementRequirement): string {
   return parts.length ? parts.join(' · ') : 'any ready die';
 }
 
+function isLowRollFriendly(requirement: PlacementRequirement): boolean {
+  return (
+    (requirement.minimumValue ?? 1) <= 2 &&
+    !requirement.affinities?.length &&
+    Object.keys(requirement.cost ?? {}).length === 0
+  );
+}
+
 export function App() {
   const [selectedFaction, setSelectedFaction] = useState<FactionId>(
     factions[0].id,
@@ -147,6 +155,52 @@ export function App() {
   const inspectedLocation = game?.locations.find(
     (location) => location.id === inspectedLocationId,
   );
+  const pressure = useMemo(() => {
+    if (!game || !human) return null;
+    const openLocations = game.locations.filter(
+      (location) => location.isActive !== false,
+    );
+    const openSlots = openLocations.flatMap((location) =>
+      location.slots
+        .filter((slot) => slot.isOpen !== false)
+        .map((slot) => ({ location, slot })),
+    );
+    const occupiedSlots = openSlots.filter(
+      ({ slot }) => slot.occupantDieId !== null,
+    );
+    const placementActions = legalActions.filter(
+      (action) => action.type === 'place-die',
+    );
+    const readyDice = human.dice.filter((die) => die.status === 'ready');
+    const readyDiceWithRoutes = new Set(
+      placementActions
+        .filter((action) => action.playerId === human.id)
+        .map((action) => (action.type === 'place-die' ? action.dieId : null)),
+    );
+    const lowDice = readyDice.filter((die) => {
+      const face =
+        die.rolledFaceIndex === null ? null : die.faces[die.rolledFaceIndex];
+      return Boolean(face && face.value <= 2);
+    });
+    const lowDiceWithRoutes = lowDice.filter((die) =>
+      readyDiceWithRoutes.has(die.id),
+    );
+    return {
+      openLocations: openLocations.length,
+      sealedLocations: game.locations.length - openLocations.length,
+      remainingSlots: openSlots.length - occupiedSlots.length,
+      totalOpenSlots: openSlots.length,
+      lowRollRoutes: openSlots.filter(({ slot }) =>
+        isLowRollFriendly(slot.requirement),
+      ).length,
+      readyDice: readyDice.length,
+      readyDiceWithRoutes: readyDice.filter((die) =>
+        readyDiceWithRoutes.has(die.id),
+      ).length,
+      lowDice: lowDice.length,
+      lowDiceWithRoutes: lowDiceWithRoutes.length,
+    };
+  }, [game, human, legalActions]);
 
   const appendEvents = (events: readonly GameEvent[], nextState: GameState) => {
     setLog((current) =>
@@ -534,6 +588,40 @@ export function App() {
                   );
                 })}
               </div>
+              {pressure && (
+                <section className="pressure-panel" aria-label="Round pressure">
+                  <div className="panel-heading">
+                    <h3>Round pressure</h3>
+                    <span>
+                      {pressure.remainingSlots}/{pressure.totalOpenSlots} slots
+                      left
+                    </span>
+                  </div>
+                  <div className="pressure-grid">
+                    <span>
+                      <strong>{pressure.openLocations}</strong>
+                      open regions
+                    </span>
+                    <span>
+                      <strong>{pressure.sealedLocations}</strong>
+                      sealed regions
+                    </span>
+                    <span>
+                      <strong>{pressure.readyDiceWithRoutes}</strong>
+                      playable dice
+                    </span>
+                    <span>
+                      <strong>{pressure.lowRollRoutes}</strong>
+                      low-roll routes
+                    </span>
+                  </div>
+                  <p>
+                    {pressure.lowDice > 0
+                      ? `${pressure.lowDiceWithRoutes}/${pressure.lowDice} low dice still have a legal route.`
+                      : 'No low dice rolled right now.'}
+                  </p>
+                </section>
+              )}
               <section
                 className="card-panel"
                 aria-label="Card hand and market"

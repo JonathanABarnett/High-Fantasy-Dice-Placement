@@ -18,6 +18,9 @@ test('starts a deterministic human-versus-CPU match', async ({ page }) => {
   await expect(page.locator('.placement-guide')).toContainText(
     '6 active regions · 8 contested slots',
   );
+  await expect(
+    page.getByRole('region', { name: 'Round pressure' }),
+  ).toContainText('8/8 slots left');
 });
 
 test('explains resources and clearly marks die placement routes', async ({

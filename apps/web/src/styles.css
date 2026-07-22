@@ -504,6 +504,48 @@ select {
 .die[draggable='true']:active {
   cursor: grabbing;
 }
+.pressure-panel {
+  margin-top: 0.75rem;
+  padding: 0.7rem;
+  border: 1px solid #51412e;
+  border-radius: 0.5rem;
+  background:
+    linear-gradient(135deg, rgb(73 45 24 / 38%), transparent), #151310;
+}
+.pressure-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+.pressure-grid span {
+  display: grid;
+  gap: 0.05rem;
+  min-height: 3.1rem;
+  padding: 0.45rem;
+  border: 1px solid #3f3428;
+  border-radius: 0.35rem;
+  color: #9f927f;
+  background: #1b1712;
+  font-size: 0.6rem;
+  font-weight: 800;
+  place-content: center;
+  text-align: center;
+  text-transform: uppercase;
+}
+.pressure-grid strong {
+  color: #f1ca7f;
+  font:
+    900 1.05rem Inter,
+    ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+.pressure-panel p {
+  margin: 0.55rem 0 0;
+  color: #b9ab94;
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
 .location-preview {
   min-height: 8.3rem;
   margin-top: 0.9rem;
