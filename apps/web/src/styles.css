@@ -392,10 +392,14 @@ select {
   position: absolute;
   z-index: 2;
   padding: 0;
-  border: 0;
+  border: 0 !important;
   border-radius: 0.65rem;
-  background: transparent;
+  background: transparent !important;
   cursor: help;
+}
+.location-inspect-hotspot:hover:not(:disabled) {
+  border: 0 !important;
+  background: transparent !important;
 }
 .location-inspect-hotspot:hover,
 .location-inspect-hotspot:focus-visible {
