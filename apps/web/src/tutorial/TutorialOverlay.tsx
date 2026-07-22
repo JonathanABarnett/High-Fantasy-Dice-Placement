@@ -65,12 +65,12 @@ const STEPS: readonly TutorialStep[] = [
     tip: 'Some cards need a ready die selected as their target.',
   },
   {
-    anchor: 'board',
+    anchor: 'forge-location',
     eyebrow: 'Permanent power',
     title: 'Unlock upgrades at Forge Hall',
     symbol: '⚒',
-    body: 'Place a die at Forge Hall to reveal the Forge panel for that round. Spend materials to permanently replace one face on any of your dice.',
-    tip: 'New face symbols grant bonus resources—or a masterwork victory point—when placed.',
+    body: 'When Forge Hall is open this round, place a die there to reveal the Forge panel. Then spend materials to permanently replace one face on any of your dice.',
+    tip: 'If Forge Hall is sealed, plan around materials now and watch for it in a later round.',
   },
   {
     anchor: 'pass',

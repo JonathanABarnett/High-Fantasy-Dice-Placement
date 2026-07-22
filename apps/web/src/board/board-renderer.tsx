@@ -45,6 +45,15 @@ const LOCATION_POINTS: readonly BoardPoint[] = [
   { x: 914, y: 520 },
 ];
 
+function tutorialHotspotStyle(point: BoardPoint) {
+  return {
+    left: `${(point.x / BOARD_WIDTH) * 100}%`,
+    top: `${(point.y / BOARD_HEIGHT) * 100}%`,
+    width: `${(CARD_WIDTH / BOARD_WIDTH) * 100}%`,
+    height: `${(CARD_HEIGHT / BOARD_HEIGHT) * 100}%`,
+  };
+}
+
 const REGION_COLORS: Readonly<Record<string, number>> = {
   arcane: 0x4f3a74,
   knowledge: 0x35516d,
@@ -493,6 +502,10 @@ export function BoardRenderer(props: BoardRendererProps) {
       total + location.slots.filter((slot) => slot.isOpen !== false).length,
     0,
   );
+  const forgeIndex = props.game.locations.findIndex((location) =>
+    location.tags.includes('forge'),
+  );
+  const forgePoint = LOCATION_POINTS[forgeIndex];
 
   return (
     <div
@@ -503,6 +516,14 @@ export function BoardRenderer(props: BoardRendererProps) {
       onDrop={onDrop}
       ref={hostRef}
     >
+      {forgePoint && (
+        <div
+          aria-hidden="true"
+          className="tutorial-hotspot"
+          data-tutorial="forge-location"
+          style={tutorialHotspotStyle(forgePoint)}
+        />
+      )}
       <div className="placement-guide" aria-live="polite">
         {selectedDie ? (
           <>

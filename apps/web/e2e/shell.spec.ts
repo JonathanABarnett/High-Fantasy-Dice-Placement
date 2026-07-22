@@ -77,6 +77,12 @@ test('guides a new player through the complete visual tutorial', async ({
   for (const title of remainingTitles) {
     await tutorial.getByRole('button', { name: 'Next' }).click();
     await expect(tutorial.getByRole('heading', { name: title })).toBeVisible();
+    if (title === 'Unlock upgrades at Forge Hall') {
+      const boardBox = await page.getByTestId('pixi-board').boundingBox();
+      const focusBox = await page.locator('.tutorial-focus').boundingBox();
+      expect(focusBox?.width ?? 0).toBeLessThan((boardBox?.width ?? 0) / 3);
+      await expect(tutorial).toContainText('When Forge Hall is open');
+    }
   }
 
   await tutorial.getByRole('button', { name: 'Begin playing' }).click();

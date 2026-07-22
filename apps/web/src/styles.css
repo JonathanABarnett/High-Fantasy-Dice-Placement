@@ -361,6 +361,11 @@ select {
   max-width: 100%;
   touch-action: manipulation;
 }
+.tutorial-hotspot {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+}
 .placement-guide {
   position: absolute;
   z-index: 3;
