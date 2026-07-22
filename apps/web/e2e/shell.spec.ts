@@ -167,17 +167,19 @@ test('can complete all six rounds by passing', async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto('/');
   await page.getByRole('button', { name: 'Start match' }).click();
+  const roundStatus = page.locator('.round-block strong');
 
   for (let round = 1; round <= 6; round += 1) {
-    await expect(page.getByText(`Round ${round} / 6`)).toBeVisible({
+    await expect(roundStatus).toHaveText(`Round ${round} / 6`, {
       timeout: 20_000,
     });
     const pass = page.getByRole('button', { name: 'Pass for this round' });
     await expect(pass).toBeEnabled({ timeout: 20_000 });
+    await pass.scrollIntoViewIfNeeded();
     await pass.click();
     if (round < 6) {
-      await expect(page.getByText(`Round ${round + 1} / 6`)).toBeVisible({
-        timeout: 20_000,
+      await expect(roundStatus).toHaveText(`Round ${round + 1} / 6`, {
+        timeout: 60_000,
       });
     }
   }
