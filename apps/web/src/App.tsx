@@ -5,13 +5,16 @@ import {
   cards,
   factions,
   locations,
+  objectives,
   upgrades,
 } from '@shattered-crown/game-content';
 import {
   applyAction,
   createGame,
   deserializeGame,
+  dieValue,
   enumerateLegalActions,
+  raidDamageFor,
   serializeGame,
   validateAction,
 } from '@shattered-crown/game-engine';
@@ -42,7 +45,7 @@ import emberPortrait from '../../../assets/generated/factions/ember-dominion-v1.
 import stoneboundPortrait from '../../../assets/generated/factions/stonebound-league-v1.png';
 import verdantPortrait from '../../../assets/generated/factions/verdant-covenant-v1.png';
 
-const SAVE_KEY = 'shattered-crown.debug-match.v3';
+const SAVE_KEY = 'shattered-crown.debug-match.v4';
 const TUTORIAL_KEY = 'shattered-crown.tutorial-complete.v1';
 const FACTION_PORTRAITS: Readonly<Record<string, string>> = {
   'arcanum-conclave': arcanumPortrait,
@@ -76,6 +79,39 @@ function describeEvent(event: GameEvent, state: GameState): string {
       state.locations.find((item) => item.id === event.locationId)?.name ??
       event.locationId;
     return `${player} placed a die at ${location}.`;
+  }
+  if (event.type === 'monster-slain') {
+    const flourish = event.critical ? ' with a CRITICAL STRIKE' : '';
+    const spoils =
+      event.overkill > 0 ? `, looting ${event.overkill} extra` : '';
+    return `⚔ ${player} slew the ${event.beast}${flourish} for ${event.bonusVictoryPoints} VP${spoils}!`;
+  }
+  if (event.type === 'raid-damaged') {
+    return `⚔ ${player} hit the ${event.beast} for ${event.damage} — ${event.remaining}/${event.health} health remains.`;
+  }
+  if (event.type === 'die-bumped') {
+    const victim =
+      state.players.find((item) => item.id === event.victimPlayerId)?.name ??
+      'a rival';
+    const location =
+      state.locations.find((item) => item.id === event.locationId)?.name ??
+      event.locationId;
+    return `⚡ ${player} bumped ${victim}'s die off ${location}!`;
+  }
+  if (event.type === 'die-boosted') {
+    return `↑ ${player} empowered a die by +${event.amount} to value ${event.value}.`;
+  }
+  if (event.type === 'resource-stolen') {
+    const victim =
+      state.players.find((item) => item.id === event.victimPlayerId)?.name ??
+      'a rival';
+    return `⚡ ${player} stole ${event.amount} ${event.resource} from ${victim}.`;
+  }
+  if (event.type === 'objective-claimed') {
+    const objective = state.objectives.find(
+      (item) => item.id === event.objectiveId,
+    );
+    return `★ ${player} claimed "${objective?.name ?? event.objectiveId}" for ${event.victoryPoints} VP!`;
   }
   if (event.type === 'resource-gained')
     return `${player} gained ${event.amount} ${event.resource}.`;
@@ -152,7 +188,9 @@ export function App() {
   const [selectedFaction, setSelectedFaction] = useState<FactionId>(
     factions[0].id,
   );
-  const [seed, setSeed] = useState('shattered-crown-001');
+  // Chosen so Forge Hall opens in round one, keeping the tutorial's Forge step
+  // demonstrable on a first run.
+  const [seed, setSeed] = useState('shattered-crown-008');
   const [game, setGame] = useState<GameState | null>(null);
   const [selectedDieId, setSelectedDieId] = useState<DieId | null>(null);
   const [upgradeDieId, setUpgradeDieId] = useState<DieId | null>(null);
@@ -181,6 +219,8 @@ export function App() {
   const inspectedLocation = game?.locations.find(
     (location) => location.id === inspectedLocationId,
   );
+  const selectedDie =
+    human?.dice.find((die) => die.id === selectedDieId) ?? null;
   const pressure = useMemo(() => {
     if (!game || !human) return null;
     const openLocations = game.locations.filter(
@@ -247,7 +287,7 @@ export function App() {
       seed: seed.trim() || 'shattered-crown-001',
       humanFactionId: selectedFaction,
       cpuFactionId: cpuFaction.id,
-      content: { factions, locations, cards, upgrades },
+      content: { factions, locations, cards, upgrades, objectives },
     });
     setGame(created.state);
     setSelectedDieId(null);
@@ -291,13 +331,23 @@ export function App() {
     }
     const location = game.locations.find((item) => item.id === locationId);
     if (!location) return;
-    const candidates = location.slots.map((slot): GameAction => ({
-      type: 'place-die',
-      playerId: human.id,
-      dieId,
-      locationId,
-      slotId: slot.id,
-    }));
+    // Prefer a free slot; fall back to contesting an enemy-held one.
+    const candidates: GameAction[] = [
+      ...location.slots.map((slot): GameAction => ({
+        type: 'place-die',
+        playerId: human.id,
+        dieId,
+        locationId,
+        slotId: slot.id,
+      })),
+      ...location.slots.map((slot): GameAction => ({
+        type: 'bump-die',
+        playerId: human.id,
+        dieId,
+        locationId,
+        slotId: slot.id,
+      })),
+    ];
     const legal = candidates.find(
       (candidate) => validateAction(game, candidate).legal,
     );
@@ -394,6 +444,13 @@ export function App() {
             {
               factions.find((faction) => faction.id === selectedFaction)
                 ?.passiveAbility
+            }
+          </p>
+          <p className="ability scoring">
+            <strong>Scores:</strong>{' '}
+            {
+              factions.find((faction) => faction.id === selectedFaction)
+                ?.scoringRule
             }
           </p>
           <label>
@@ -574,17 +631,20 @@ export function App() {
               <div className="dice" data-tutorial="dice">
                 {human?.dice.map((die) => {
                   const affinity = AFFINITY_INFO[die.affinity];
+                  const boost = die.valueBonus ?? 0;
                   const value =
-                    die.rolledFaceIndex === null
-                      ? '—'
-                      : die.faces[die.rolledFaceIndex]?.value;
+                    die.rolledFaceIndex === null ? '—' : dieValue(die);
+                  const classes = [
+                    'die',
+                    `die-${die.affinity}`,
+                    selectedDieId === die.id ? 'selected' : '',
+                    boost > 0 ? 'boosted' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ');
                   return (
                     <button
-                      className={
-                        selectedDieId === die.id
-                          ? `die die-${die.affinity} selected`
-                          : `die die-${die.affinity}`
-                      }
+                      className={classes}
                       data-tooltip={`${affinity.label}: ${affinity.description}`}
                       disabled={
                         die.status !== 'ready' ||
@@ -609,6 +669,7 @@ export function App() {
                         {affinity.icon}
                       </span>
                       <strong>{value}</strong>
+                      {boost > 0 && <span className="die-boost">+{boost}</span>}
                       <span className="die-affinity">{affinity.label}</span>
                     </button>
                   );
@@ -646,6 +707,60 @@ export function App() {
                       ? `${pressure.lowDiceWithRoutes}/${pressure.lowDice} low dice still have a legal route.`
                       : 'No low dice rolled right now.'}
                   </p>
+                </section>
+              )}
+              {game.objectives.length > 0 && (
+                <section
+                  aria-label="Crown quests"
+                  className="quest-panel"
+                  data-tutorial="quests"
+                >
+                  <div className="panel-heading">
+                    <h3>Crown Quests</h3>
+                    <span>
+                      {
+                        game.objectives.filter(
+                          (item) => item.claimedBy === null,
+                        ).length
+                      }{' '}
+                      unclaimed
+                    </span>
+                  </div>
+                  <ul className="quest-list">
+                    {game.objectives.map((objective) => {
+                      const claimant = game.players.find(
+                        (player) => player.id === objective.claimedBy,
+                      );
+                      const mine = objective.claimedBy === human?.id;
+                      return (
+                        <li
+                          className={
+                            claimant
+                              ? mine
+                                ? 'quest claimed-by-you'
+                                : 'quest claimed-by-rival'
+                              : 'quest'
+                          }
+                          key={objective.id}
+                        >
+                          <div className="quest-title">
+                            <strong>{objective.name}</strong>
+                            <ResourceToken
+                              compact
+                              resource="victoryPoints"
+                              value={objective.victoryPoints}
+                            />
+                          </div>
+                          <p>{objective.description}</p>
+                          <em>
+                            {claimant
+                              ? `${mine ? '✓ Claimed by you' : `Claimed by ${claimant.name}`}`
+                              : 'Unclaimed — first to finish takes it'}
+                          </em>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </section>
               )}
               <section
@@ -882,9 +997,72 @@ export function App() {
                         values={inspectedLocation.reward}
                       />
                     </div>
+                    {inspectedLocation.encounter &&
+                      inspectedLocation.encounter.health === undefined && (
+                        <div className="encounter-banner">
+                          <strong>⚔ Monster Hunt</strong>
+                          <p>
+                            Beat a beast's threat to slay it. Each point over
+                            its threat loots +1{' '}
+                            {inspectedLocation.encounter.loot}, and a natural 6
+                            or masterwork face lands a critical strike for +
+                            {inspectedLocation.encounter.criticalBonus}★.
+                          </p>
+                        </div>
+                      )}
+                    {inspectedLocation.encounter?.health !== undefined &&
+                      (() => {
+                        const encounter = inspectedLocation.encounter;
+                        const health = encounter.health ?? 0;
+                        const remaining = Math.max(
+                          0,
+                          health - (game.raidDamage[inspectedLocation.id] ?? 0),
+                        );
+                        return (
+                          <div className="encounter-banner raid">
+                            <strong>
+                              {remaining === 0
+                                ? `☠ ${encounter.beasts[0]} slain`
+                                : `⚔ Raid · ${encounter.beasts[0]}`}
+                            </strong>
+                            {remaining > 0 ? (
+                              <>
+                                <div
+                                  aria-label={`${remaining} of ${health} health remaining`}
+                                  className="raid-bar"
+                                  role="img"
+                                >
+                                  <span
+                                    style={{
+                                      width: `${(remaining / health) * 100}%`,
+                                    }}
+                                  />
+                                </div>
+                                <p>
+                                  <strong className="raid-health">
+                                    {remaining}/{health} health
+                                  </strong>{' '}
+                                  — each die dealt here damages the beast by its
+                                  value, doubled on a natural 6 or masterwork
+                                  face. The finishing blow claims{' '}
+                                  {encounter.bounty?.victoryPoints ?? 0}★ and
+                                  the hoard.
+                                </p>
+                              </>
+                            ) : (
+                              <p>
+                                The hoard is claimed. This road is an ordinary
+                                passage now.
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
                     <ul className="preview-slots">
                       {inspectedLocation.slots.map((slot, index) => {
-                        const action: GameAction | null =
+                        const encounter = inspectedLocation.encounter;
+                        const isRaid = encounter?.health !== undefined;
+                        const placement: GameAction | null =
                           selectedDieId && human
                             ? {
                                 type: 'place-die',
@@ -894,15 +1072,97 @@ export function App() {
                                 slotId: slot.id,
                               }
                             : null;
-                        const validation = action
-                          ? validateAction(game, action)
+                        let validation = placement
+                          ? validateAction(game, placement)
                           : null;
+                        // An enemy-held slot can still be contested by force.
+                        let isBump = false;
+                        if (
+                          validation &&
+                          !validation.legal &&
+                          selectedDieId &&
+                          human &&
+                          slot.occupantDieId !== null &&
+                          slot.occupantPlayerId !== human.id
+                        ) {
+                          const bump = validateAction(game, {
+                            type: 'bump-die',
+                            playerId: human.id,
+                            dieId: selectedDieId,
+                            locationId: inspectedLocation.id,
+                            slotId: slot.id,
+                          });
+                          if (bump.legal) {
+                            validation = bump;
+                            isBump = true;
+                          }
+                        }
+                        const beast = isRaid
+                          ? (encounter?.beasts[0] ?? null)
+                          : (encounter?.beasts[index] ?? null);
+                        const face =
+                          selectedDie?.rolledFaceIndex == null
+                            ? null
+                            : selectedDie.faces[selectedDie.rolledFaceIndex];
+                        let outcome: string | null = null;
+                        if (
+                          encounter &&
+                          selectedDie &&
+                          face &&
+                          validation?.legal
+                        ) {
+                          const value = dieValue(selectedDie);
+                          const critical =
+                            value >= 6 || face.symbols.includes('masterwork');
+                          if (isRaid) {
+                            const health = encounter.health ?? 0;
+                            const remaining = Math.max(
+                              0,
+                              health -
+                                (game.raidDamage[inspectedLocation.id] ?? 0),
+                            );
+                            // Ask the engine, so the preview can never drift
+                            // from the damage the rules actually apply.
+                            const damage = human
+                              ? raidDamageFor(human, selectedDie)
+                              : value;
+                            outcome =
+                              remaining === 0
+                                ? null
+                                : damage >= remaining
+                                  ? `KILLING BLOW · ${damage} damage · claims ${encounter.bounty?.victoryPoints ?? 0}★ and the hoard`
+                                  : `${damage} damage${critical ? ' (CRITICAL ×2)' : ''} · ${remaining - damage} health left`;
+                          } else {
+                            const reduction =
+                              human?.factionAbilityId ===
+                                'verdant-adaptation' &&
+                              selectedDie.affinity === 'nature'
+                                ? 1
+                                : 0;
+                            const threat = Math.max(
+                              1,
+                              (slot.requirement.minimumValue ?? 1) - reduction,
+                            );
+                            const overkill = Math.max(0, value - threat);
+                            outcome = `Slay ${beast}${
+                              overkill > 0
+                                ? ` · +${overkill} ${encounter.loot}`
+                                : ''
+                            }${
+                              critical
+                                ? ` · CRITICAL +${encounter.criticalBonus}★`
+                                : ''
+                            }`;
+                          }
+                        }
                         return (
                           <li
                             className={
                               validation
                                 ? validation.legal
-                                  ? 'slot-preview legal'
+                                  ? isBump
+                                    ? 'slot-preview bumpable'
+                                    : 'slot-preview legal'
                                   : 'slot-preview blocked'
                                 : 'slot-preview'
                             }
@@ -911,21 +1171,40 @@ export function App() {
                             <strong>
                               {validation
                                 ? validation.legal
-                                  ? '✓ PLAYABLE'
+                                  ? isBump
+                                    ? '⚡ BUMP'
+                                    : '✓ PLAYABLE'
                                   : '× BLOCKED'
                                 : `SLOT ${index + 1}`}
                             </strong>
+                            {beast && !isRaid && (
+                              <span className="beast-tag">⚔ {beast}</span>
+                            )}
                             <span>
                               <RequirementTokens
                                 requirement={slot.requirement}
                               />
                             </span>
-                            {validation && (
-                              <em>
-                                {validation.legal
-                                  ? 'Legal placement'
-                                  : validation.message}
+                            {isBump && (
+                              <em className="bump-projection">
+                                Drive off the rival die — costs 1{' '}
+                                {human?.factionAbilityId === 'arcane-resonance'
+                                  ? 'mana'
+                                  : 'influence'}{' '}
+                                and returns their die to them ready.
                               </em>
+                            )}
+                            {outcome ? (
+                              <em className="slay-projection">{outcome}</em>
+                            ) : (
+                              !isBump &&
+                              validation && (
+                                <em>
+                                  {validation.legal
+                                    ? 'Legal placement'
+                                    : validation.message}
+                                </em>
+                              )
                             )}
                           </li>
                         );
@@ -946,7 +1225,8 @@ export function App() {
                     {game.locations.map((location) => {
                       const action = legalActions.find(
                         (candidate) =>
-                          candidate.type === 'place-die' &&
+                          (candidate.type === 'place-die' ||
+                            candidate.type === 'bump-die') &&
                           candidate.dieId === selectedDieId &&
                           candidate.locationId === location.id,
                       );

@@ -97,8 +97,12 @@ test('guides a new player through the complete visual tutorial', async ({
     'Read and select your dice',
     'Place dice to gain rewards',
     'Inspect rewards and restrictions',
+    'Hunt monsters for their spoils',
+    'Wound the Elder Dragon together',
+    'Bump rivals off contested slots',
     'Play cards or visit the market',
     'Unlock upgrades at Forge Hall',
+    'Claim the Crown Quests first',
     'Pass when your plans are complete',
     'Follow the log and build your score',
   ];
@@ -151,6 +155,9 @@ test('unlocks Forge Hall and permanently upgrades a die face', async ({
   page,
 }) => {
   await page.goto('/');
+  // Pin a seed whose round-one board opens Forge Hall, rather than depending on
+  // whichever seed the setup screen happens to default to.
+  await page.getByLabel('Match seed').fill('shattered-crown-008');
   await page.getByRole('button', { name: 'Start match' }).click();
   await page.locator('.die:not([disabled])').first().click();
   await page.getByText('Keyboard placement options').click();

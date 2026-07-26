@@ -5,6 +5,9 @@ import type {
   FactionDefinition,
   FactionId,
   LocationId,
+  MonsterEncounter,
+  Objective,
+  ObjectiveId,
   PlacementRequirement,
   ResourcePool,
   SlotId,
@@ -19,6 +22,7 @@ const cardId = (value: string) => value as CardId;
 const locationId = (value: string) => value as LocationId;
 const slotId = (value: string) => value as SlotId;
 const upgradeId = (value: string) => value as UpgradeId;
+const objectiveId = (value: string) => value as ObjectiveId;
 
 export const factions = [
   {
@@ -26,17 +30,17 @@ export const factions = [
     name: 'Arcanum Conclave',
     passiveAbilityId: 'arcane-resonance',
     passiveAbility:
-      'Gain 1 additional mana when placing an Arcane die at an Arcane location.',
+      'Gain 1 additional mana at any Arcane location, or 2 with an Arcane die, and bump rivals for 1 mana instead of 1 influence.',
     roundAbility: 'Begin with Revelation of Stars in hand.',
     startingCardId: cardId('arcanum-starting-card'),
-    scoringRule: 'Score 1 point for every 3 mana at the end of the match.',
+    scoringRule: 'Score 1 point for every 2 mana at the end of the match.',
   },
   {
     id: factionId('ember-dominion'),
     name: 'Ember Dominion',
     passiveAbilityId: 'martial-glory',
     passiveAbility:
-      'Gain 1 victory point when placing a Martial die at a Martial location.',
+      'Gain 1 victory point when placing a Martial die at a Martial location, and deal 2 extra damage to raid bosses.',
     roundAbility: 'Begin with Draconic Challenge in hand.',
     startingCardId: cardId('ember-starting-card'),
     scoringRule:
@@ -46,19 +50,22 @@ export const factions = [
     id: factionId('verdant-covenant'),
     name: 'Verdant Covenant',
     passiveAbilityId: 'verdant-adaptation',
-    passiveAbility: 'Nature dice treat placement minimums as 1 lower.',
+    passiveAbility:
+      'Field a sixth Nature die. Nature dice treat placement minimums as 1 lower, and you gain 1 influence whenever one of your dice is bumped.',
     roundAbility: 'Begin with Gifts of the Grove in hand.',
     startingCardId: cardId('verdant-starting-card'),
-    scoringRule: 'Score 1 point for every 3 different resource types held.',
+    scoringRule:
+      'Score 1 point for each resource type you hold 3 or more of at the end of the match.',
   },
   {
     id: factionId('stonebound-league'),
     name: 'Stonebound League',
     passiveAbilityId: 'stonebound-craft',
-    passiveAbility: 'Gain 1 additional material when placing at Forge Hall.',
+    passiveAbility:
+      'Gain 1 additional material when placing at Forge Hall, and rivals must pay 1 extra influence to bump your dice.',
     roundAbility: 'Begin with Masterwork Blueprint in hand.',
     startingCardId: cardId('stonebound-starting-card'),
-    scoringRule: 'Score 1 point for every 3 materials at the end of the match.',
+    scoringRule: 'Score 1 point for every 5 materials at the end of the match.',
   },
 ] as const satisfies readonly FactionDefinition[];
 
@@ -218,6 +225,75 @@ export const cards = [
     target: 'none',
     marketCopies: 2,
   },
+  {
+    id: cardId('war-cry'),
+    name: 'War Cry',
+    category: 'tactic',
+    cost: { gold: 1 },
+    effects: [{ type: 'boost-die', amount: 2 }],
+    rulesText: 'A ready die gains +2 value this round.',
+    target: 'ready-die',
+    marketCopies: 3,
+  },
+  {
+    id: cardId('elixir-of-might'),
+    name: 'Elixir of Might',
+    category: 'relic',
+    cost: { mana: 1, materials: 1 },
+    effects: [{ type: 'boost-die', amount: 3 }],
+    rulesText: 'A ready die gains +3 value this round.',
+    target: 'ready-die',
+    marketCopies: 2,
+  },
+  {
+    id: cardId('ballista-volley'),
+    name: 'Ballista Volley',
+    category: 'tactic',
+    cost: { materials: 1 },
+    effects: [
+      { type: 'damage-raid', amount: 6 },
+      { type: 'gain-resource', resource: 'gold', amount: 1 },
+    ],
+    rulesText: 'Deal 6 damage to the raid boss, then gain 1 gold.',
+    target: 'none',
+    marketCopies: 2,
+  },
+  {
+    id: cardId('dragon-bait'),
+    name: 'Dragon Bait',
+    category: 'tactic',
+    cost: { knowledge: 1 },
+    effects: [
+      { type: 'damage-raid', amount: 4 },
+      { type: 'draw-card', amount: 1 },
+    ],
+    rulesText: 'Deal 4 damage to the raid boss, then draw a card.',
+    target: 'none',
+    marketCopies: 2,
+  },
+  {
+    id: cardId('cutpurse'),
+    name: 'Cutpurse',
+    category: 'ally',
+    cost: { influence: 1 },
+    effects: [{ type: 'steal-resource', resource: 'gold', amount: 2 }],
+    rulesText: 'Steal 2 gold from every rival.',
+    target: 'none',
+    marketCopies: 2,
+  },
+  {
+    id: cardId('court-saboteur'),
+    name: 'Court Saboteur',
+    category: 'ally',
+    cost: { gold: 1 },
+    effects: [
+      { type: 'steal-resource', resource: 'influence', amount: 1 },
+      { type: 'gain-resource', resource: 'knowledge', amount: 1 },
+    ],
+    rulesText: 'Steal 1 influence from every rival, then gain 1 knowledge.',
+    target: 'none',
+    marketCopies: 2,
+  },
 ] as const satisfies readonly Card[];
 
 export const upgrades = [
@@ -271,6 +347,51 @@ export const upgrades = [
   },
 ] as const satisfies readonly UpgradeDefinition[];
 
+export const objectives = [
+  {
+    id: objectiveId('dragonslayer'),
+    name: 'Dragonslayer',
+    description: 'First to slay 2 monsters claims the glory.',
+    victoryPoints: 4,
+    condition: { type: 'monsters-slain', amount: 2 },
+  },
+  {
+    id: objectiveId('dragon-hoard'),
+    name: 'Dragon Hoard',
+    description: 'First to amass 8 gold.',
+    victoryPoints: 3,
+    condition: { type: 'total-resource', resource: 'gold', amount: 8 },
+  },
+  {
+    id: objectiveId('master-smith'),
+    name: 'Master Smith',
+    description: 'First to forge 2 permanent die upgrades.',
+    victoryPoints: 3,
+    condition: { type: 'upgrades-forged', amount: 2 },
+  },
+  {
+    id: objectiveId('grand-vizier'),
+    name: 'Grand Vizier',
+    description: 'First to play 3 cards.',
+    victoryPoints: 3,
+    condition: { type: 'cards-played', amount: 3 },
+  },
+  {
+    id: objectiveId('warlord'),
+    name: 'Warlord',
+    description: 'First to make 4 combat placements.',
+    victoryPoints: 4,
+    condition: { type: 'tag-placements', tag: 'combat', amount: 4 },
+  },
+  {
+    id: objectiveId('archmage'),
+    name: 'Archmage',
+    description: 'First to channel 8 mana.',
+    victoryPoints: 3,
+    condition: { type: 'total-resource', resource: 'mana', amount: 8 },
+  },
+] as const satisfies readonly Objective[];
+
 interface LocationInput {
   readonly id: string;
   readonly name: string;
@@ -279,6 +400,7 @@ interface LocationInput {
   readonly reward: Partial<ResourcePool> & { readonly victoryPoints?: number };
   readonly first?: PlacementRequirement;
   readonly second?: PlacementRequirement;
+  readonly encounter?: MonsterEncounter;
 }
 
 function defineLocation(input: LocationInput): BoardLocation {
@@ -302,6 +424,7 @@ function defineLocation(input: LocationInput): BoardLocation {
         requirement: input.second ?? input.first ?? {},
       },
     ],
+    ...(input.encounter ? { encounter: input.encounter } : {}),
   };
 }
 
@@ -390,20 +513,36 @@ export const locations = [
   defineLocation({
     id: 'ruined-stronghold',
     name: 'Ruined Stronghold',
-    description: 'Challenge the creatures occupying the old walls.',
+    description:
+      'Beasts haunt the old walls. Strike harder than their threat to loot the ruin; a crushing blow salvages extra materials.',
     tags: ['martial', 'combat'],
-    reward: { gold: 1, victoryPoints: 2 },
+    reward: { gold: 2, victoryPoints: 1 },
     first: { minimumValue: 4 },
     second: { minimumValue: 5, affinities: ['martial', 'neutral'] },
+    encounter: {
+      title: 'Ruined Stronghold',
+      beasts: ['Ghoul Warband', 'Ogre Warlord'],
+      loot: 'materials',
+      criticalBonus: 2,
+    },
   }),
   defineLocation({
     id: 'dragon-pass',
     name: 'Dragon Pass',
-    description: 'Risk the high road for renown.',
+    description:
+      'The Elder Dragon guards the high road. Wound it round after round — critical hits bite twice as deep — and the blow that fells it seizes the whole hoard.',
     tags: ['martial', 'combat'],
-    reward: { influence: 1, victoryPoints: 3 },
-    first: { minimumValue: 5 },
-    second: { minimumValue: 6 },
+    reward: { influence: 1 },
+    first: { minimumValue: 3 },
+    second: { minimumValue: 5 },
+    encounter: {
+      title: 'Dragon Pass',
+      beasts: ['Elder Dragon'],
+      loot: 'gold',
+      criticalBonus: 0,
+      health: 20,
+      bounty: { victoryPoints: 6, loot: { gold: 3 } },
+    },
   }),
   defineLocation({
     id: 'watchtower',

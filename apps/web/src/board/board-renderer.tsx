@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { dieValue } from '@shattered-crown/game-engine';
 import type {
   DieId,
   GameAction,
@@ -209,8 +210,14 @@ export function BoardRenderer(props: BoardRendererProps) {
     const legalLocationIds = new Set(
       props.legalActions
         .filter(
-          (action): action is Extract<GameAction, { type: 'place-die' }> =>
-            action.type === 'place-die' && action.dieId === props.selectedDieId,
+          (
+            action,
+          ): action is Extract<
+            GameAction,
+            { type: 'place-die' | 'bump-die' }
+          > =>
+            (action.type === 'place-die' || action.type === 'bump-die') &&
+            action.dieId === props.selectedDieId,
         )
         .map((action) => action.locationId),
     );
@@ -219,6 +226,14 @@ export function BoardRenderer(props: BoardRendererProps) {
         .filter(
           (action): action is Extract<GameAction, { type: 'place-die' }> =>
             action.type === 'place-die' && action.dieId === props.selectedDieId,
+        )
+        .map((action) => action.slotId),
+    );
+    const bumpableSlotIds = new Set(
+      props.legalActions
+        .filter(
+          (action): action is Extract<GameAction, { type: 'bump-die' }> =>
+            action.type === 'bump-die' && action.dieId === props.selectedDieId,
         )
         .map((action) => action.slotId),
     );
@@ -285,6 +300,55 @@ export function BoardRenderer(props: BoardRendererProps) {
             .roundRect(0, 0, CARD_WIDTH, CARD_HEIGHT, 18)
             .fill({ color: 0x080706, alpha: 0.5 }),
         );
+      }
+
+      if (location.encounter && isActive) {
+        const encounter = location.encounter;
+        const health = encounter.health;
+        const damage = props.game.raidDamage[location.id] ?? 0;
+        const dead = health !== undefined && damage >= health;
+        const label = dead
+          ? '☠ BEAST SLAIN'
+          : health !== undefined
+            ? `⚔ RAID · ${health - damage}/${health}`
+            : '⚔ MONSTER HUNT';
+        const hunt = new Graphics()
+          .roundRect(10, 10, 132, 22, 11)
+          .fill({ color: dead ? 0x2f2a26 : 0x571a16, alpha: 0.96 })
+          .stroke({
+            color: dead ? 0x8d8578 : 0xe8874a,
+            width: 2,
+            alpha: 1,
+          });
+        const huntText = new Text({
+          text: label,
+          style: {
+            fill: dead ? 0xcfc7ba : 0xffd7b0,
+            fontFamily: 'Arial',
+            fontSize: 10,
+            fontWeight: 'bold',
+          },
+        });
+        huntText.position.set(18, 15);
+        card.addChild(hunt, huntText);
+
+        // A health bar makes the multi-round raid readable at a glance.
+        if (health !== undefined && !dead) {
+          const remaining = Math.max(0, 1 - damage / health);
+          card.addChild(
+            new Graphics()
+              .roundRect(10, 34, 132, 7, 4)
+              .fill({ color: 0x1d1512, alpha: 0.95 })
+              .stroke({ color: 0x7a4a30, width: 1, alpha: 0.9 }),
+          );
+          if (remaining > 0) {
+            card.addChild(
+              new Graphics()
+                .roundRect(11, 35, Math.max(2, 130 * remaining), 5, 3)
+                .fill({ color: 0xd6483c, alpha: 0.95 }),
+            );
+          }
+        }
       }
 
       if (props.selectedDieId || !isActive || full) {
@@ -403,21 +467,24 @@ export function BoardRenderer(props: BoardRendererProps) {
           card.addChild(die, sealed);
         } else if (slot.occupantDieId) {
           const human = slot.occupantPlayerId === props.humanPlayerId;
-          die
-            .fill({ color: human ? 0x397f5a : 0x9a4b3f })
-            .stroke({ color: human ? 0xa9ffd0 : 0xffb29f, width: 2 });
+          const bumpable = bumpableSlotIds.has(slot.id);
+          die.fill({ color: human ? 0x397f5a : 0x9a4b3f }).stroke({
+            color: bumpable ? 0xffd24a : human ? 0xa9ffd0 : 0xffb29f,
+            width: bumpable ? 3 : 2,
+          });
           const owner = new Text({
-            text: human ? 'YOU' : 'CPU',
+            text: bumpable ? '⚡' : human ? 'YOU' : 'CPU',
             style: {
-              fill: 0xffffff,
+              fill: bumpable ? 0xffe89a : 0xffffff,
               fontFamily: 'Arial',
-              fontSize: 10,
+              fontSize: bumpable ? 13 : 10,
               fontWeight: 'bold',
             },
           });
           owner.anchor.set(0.5);
           owner.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y);
           card.addChild(die, owner);
+          if (bumpable) pulseTargets.push(die);
         } else {
           die.fill({ color: 0x171511, alpha: 0.7 }).stroke({
             color: props.selectedDieId
@@ -499,26 +566,20 @@ export function BoardRenderer(props: BoardRendererProps) {
   const selectedDie = props.game.players
     .find((player) => player.id === props.humanPlayerId)
     ?.dice.find((die) => die.id === props.selectedDieId);
-  const legalLocationCount = new Set(
-    props.legalActions
-      .filter(
-        (action) =>
-          action.type === 'place-die' && action.dieId === props.selectedDieId,
-      )
-      .map((action) =>
-        action.type === 'place-die' ? action.locationId : null,
-      ),
-  ).size;
   const legalLocationsForSelected = new Set(
     props.legalActions
       .filter(
         (action) =>
-          action.type === 'place-die' && action.dieId === props.selectedDieId,
+          (action.type === 'place-die' || action.type === 'bump-die') &&
+          action.dieId === props.selectedDieId,
       )
       .map((action) =>
-        action.type === 'place-die' ? action.locationId : null,
+        action.type === 'place-die' || action.type === 'bump-die'
+          ? action.locationId
+          : null,
       ),
   );
+  const legalLocationCount = legalLocationsForSelected.size;
   const activeLocationCount = props.game.locations.filter(
     (location) => location.isActive !== false,
   ).length;
@@ -531,6 +592,14 @@ export function BoardRenderer(props: BoardRendererProps) {
     location.tags.includes('forge'),
   );
   const forgePoint = LOCATION_POINTS[forgeIndex];
+  const huntIndex = props.game.locations.findIndex(
+    (location) => location.encounter && location.encounter.health === undefined,
+  );
+  const huntPoint = LOCATION_POINTS[huntIndex];
+  const raidIndex = props.game.locations.findIndex(
+    (location) => location.encounter?.health !== undefined,
+  );
+  const raidPoint = LOCATION_POINTS[raidIndex];
 
   return (
     <div
@@ -547,6 +616,22 @@ export function BoardRenderer(props: BoardRendererProps) {
           className="tutorial-hotspot"
           data-tutorial="forge-location"
           style={tutorialHotspotStyle(forgePoint)}
+        />
+      )}
+      {huntPoint && (
+        <div
+          aria-hidden="true"
+          className="tutorial-hotspot"
+          data-tutorial="hunt-location"
+          style={tutorialHotspotStyle(huntPoint)}
+        />
+      )}
+      {raidPoint && (
+        <div
+          aria-hidden="true"
+          className="tutorial-hotspot"
+          data-tutorial="raid-location"
+          style={tutorialHotspotStyle(raidPoint)}
         />
       )}
       {props.game.locations.map((location, index) => {
@@ -591,7 +676,10 @@ export function BoardRenderer(props: BoardRendererProps) {
               {AFFINITY_GLYPHS[selectedDie.affinity]} Value{' '}
               {selectedDie.rolledFaceIndex === null
                 ? '—'
-                : selectedDie.faces[selectedDie.rolledFaceIndex]?.value}{' '}
+                : dieValue(selectedDie)}
+              {(selectedDie.valueBonus ?? 0) > 0
+                ? ` (+${selectedDie.valueBonus})`
+                : ''}{' '}
               {selectedDie.affinity} die selected
             </strong>
             <span>{legalLocationCount} glowing locations can accept it</span>

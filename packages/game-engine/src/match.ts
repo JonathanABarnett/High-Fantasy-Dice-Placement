@@ -2,6 +2,7 @@ import type {
   ActionValidation,
   BoardLocation,
   Card,
+  ClaimableObjective,
   Die,
   DieAffinity,
   DieFace,
@@ -13,9 +14,12 @@ import type {
   GameId,
   GameState,
   MatchResult,
+  Objective,
+  ObjectiveCondition,
   PlayerId,
   PlayerState,
   ResourcePool,
+  ResourceType,
   ScoreBreakdown,
   UpgradeDefinition,
 } from '@shattered-crown/shared-types';
@@ -42,6 +46,49 @@ export interface MatchContent {
   readonly locations: readonly BoardLocation[];
   readonly cards?: readonly Card[];
   readonly upgrades?: readonly UpgradeDefinition[];
+  readonly objectives?: readonly Objective[];
+}
+
+/** How many shared objectives are drawn into a match. */
+const OBJECTIVE_COUNT = 3;
+/** Default price of bumping an enemy die off a contested slot. */
+const BUMP_COST: Partial<ResourcePool> = { influence: 1 };
+/** Arcanum bends the cost of displacement onto raw magic instead of politics. */
+const ARCANE_BUMP_COST: Partial<ResourcePool> = { mana: 1 };
+/** Ember's warbands hit raid bosses this much harder. */
+const EMBER_RAID_BONUS = 2;
+/** Extra influence demanded to shift a Stonebound die. */
+const STONEBOUND_BUMP_TAX: Partial<ResourcePool> = { influence: 1 };
+
+/**
+ * What the attacker pays, on top of any slot cost, to bump the defender.
+ * Stonebound dice are set like masonry: shifting one costs extra rather than
+ * being outright impossible, so their resilience is a tax and not a wall.
+ */
+export function bumpCostFor(
+  attacker: PlayerState,
+  defender?: PlayerState,
+): Partial<ResourcePool> {
+  const base =
+    attacker.factionAbilityId === 'arcane-resonance'
+      ? ARCANE_BUMP_COST
+      : BUMP_COST;
+  return defender?.factionAbilityId === 'stonebound-craft'
+    ? mergeCosts(base, STONEBOUND_BUMP_TAX)
+    : base;
+}
+
+/**
+ * Damage a die deals to a raid boss. Critical strikes bite twice as deep, and
+ * Ember warbands add a flat bonus on top. Exported so the CPU evaluates raids
+ * with exactly the rule the engine applies.
+ */
+export function raidDamageFor(player: PlayerState, die: Die): number {
+  const value = dieValue(die);
+  const base = isCriticalStrike(die) ? value * 2 : value;
+  return (
+    base + (player.factionAbilityId === 'martial-glory' ? EMBER_RAID_BONUS : 0)
+  );
 }
 
 export interface CreateGameOptions {
@@ -69,8 +116,17 @@ function createFaces(): Die['faces'] {
   })) as unknown as Die['faces'];
 }
 
-function createDice(playerId: PlayerId): readonly Die[] {
-  return STARTING_AFFINITIES.map((affinity, index) => ({
+function createDice(
+  playerId: PlayerId,
+  faction: FactionDefinition,
+): readonly Die[] {
+  // Verdant fields an extra Nature die: more workers, each individually
+  // smaller, which pairs with their reduced placement minimums.
+  const affinities: readonly DieAffinity[] =
+    faction.passiveAbilityId === 'verdant-adaptation'
+      ? [...STARTING_AFFINITIES, 'nature']
+      : STARTING_AFFINITIES;
+  return affinities.map((affinity, index) => ({
     id: `${playerId}-die-${index + 1}` as DieId,
     affinity,
     faces: createFaces(),
@@ -93,12 +149,13 @@ function createPlayer(
     factionId: faction.id,
     factionAbilityId: faction.passiveAbilityId,
     resources: emptyResources(),
-    dice: createDice(id),
+    dice: createDice(id, faction),
     hand: [],
     playedCards: [],
     victoryPoints: 0,
     hasPassed: false,
     placementCounts: {},
+    monstersSlain: 0,
   };
 }
 
@@ -145,6 +202,20 @@ function slotKey(locationId: string, slotIndex: number): string {
   return `${locationId}:${slotIndex}`;
 }
 
+/** Location ids whose raid boss has already been slain (health fully depleted). */
+function slainRaids(
+  locations: readonly BoardLocation[],
+  raidDamage: Readonly<Record<string, number>>,
+): Set<string> {
+  const slain = new Set<string>();
+  for (const location of locations) {
+    const health = location.encounter?.health;
+    if (health !== undefined && (raidDamage[location.id] ?? 0) >= health)
+      slain.add(location.id);
+  }
+  return slain;
+}
+
 /**
  * Scarcity scales from the actual player and dice count. The board should leave
  * players bumping elbows, while still reserving a few low-minimum routes so a
@@ -155,6 +226,7 @@ function configureRoundScarcity(
   random: SeededRandom,
   playerCount: number,
   totalDiceCount: number,
+  slainRaidIds: ReadonlySet<string>,
 ): readonly BoardLocation[] {
   const profile = scarcityProfile(
     playerCount,
@@ -184,9 +256,11 @@ function configureRoundScarcity(
     ),
   );
 
+  const lowRollSeeded = new Set<string>();
   for (const location of lowRollLocations) {
     if (openSlots.size >= profile.lowRollSlotCount) break;
     openFirstSlot(location);
+    lowRollSeeded.add(location.id);
   }
 
   for (const location of shuffledLocations) {
@@ -207,6 +281,38 @@ function configureRoundScarcity(
   for (const location of shuffledLocations) {
     if (openSlots.size >= profile.openSlotCount) break;
     openFirstSlot(location);
+  }
+
+  // Guarantee a live monster hunt each round. If the shuffle sealed every
+  // encounter (or the only active one is a slain raid), swap one in for a
+  // non-critical resource location, matching its open-slot count so the active
+  // and open totals — and the reserved low-roll routes — are all preserved.
+  const isLiveHunt = (location: BoardLocation) =>
+    Boolean(location.encounter) && !slainRaidIds.has(location.id);
+  const huntActive = shuffledLocations.some(
+    (location) => isLiveHunt(location) && activeIds.has(location.id),
+  );
+  if (!huntActive) {
+    const inactiveHunt = shuffledLocations.find(
+      (location) => isLiveHunt(location) && !activeIds.has(location.id),
+    );
+    const swappable = shuffledLocations.find(
+      (location) =>
+        !location.encounter &&
+        activeIds.has(location.id) &&
+        !lowRollSeeded.has(location.id),
+    );
+    if (inactiveHunt && swappable) {
+      const openCount = [0, 1].filter((index) =>
+        openSlots.has(slotKey(swappable.id, index)),
+      ).length;
+      activeIds.delete(swappable.id);
+      openSlots.delete(slotKey(swappable.id, 0));
+      openSlots.delete(slotKey(swappable.id, 1));
+      openAnySlot(inactiveHunt, 0);
+      if (openCount >= 2 && inactiveHunt.slots.length > 1)
+        openAnySlot(inactiveHunt, 1);
+    }
   }
 
   return locations.map((location) => {
@@ -246,7 +352,13 @@ function rollPlayers(
         dieId: die.id,
         faceIndex,
       });
-      return { ...die, rolledFaceIndex: faceIndex, status: 'ready' as const };
+      // A fresh roll wipes any temporary boost from last round's cards.
+      return {
+        ...die,
+        rolledFaceIndex: faceIndex,
+        status: 'ready' as const,
+        valueBonus: 0,
+      };
     }),
   }));
 
@@ -282,6 +394,11 @@ export function createGame(options: CreateGameOptions): TransitionResult {
   const shuffledCards = random.shuffle(cardPool);
   const cardMarket = shuffledCards.slice(0, 3);
   const cardDeck = shuffledCards.slice(3);
+  const objectivePool = options.content.objectives ?? [];
+  const objectives: readonly ClaimableObjective[] = random
+    .shuffle([...objectivePool])
+    .slice(0, OBJECTIVE_COUNT)
+    .map((objective) => ({ ...objective, claimedBy: null }));
   const cpuFactionIds = [
     options.cpuFactionId,
     ...(options.additionalCpuFactionIds ?? []),
@@ -310,6 +427,7 @@ export function createGame(options: CreateGameOptions): TransitionResult {
     random,
     players.length,
     players.reduce((total, player) => total + player.dice.length, 0),
+    new Set<string>(),
   );
   const rolled = rollPlayers(players, random, 1);
   const roundEvent: GameEvent = {
@@ -320,7 +438,7 @@ export function createGame(options: CreateGameOptions): TransitionResult {
 
   return {
     state: {
-      schemaVersion: 3,
+      schemaVersion: 4,
       id: `match-${options.seed}` as GameId,
       seed: options.seed,
       rngState: random.snapshot().state,
@@ -341,6 +459,8 @@ export function createGame(options: CreateGameOptions): TransitionResult {
       cardMarket,
       cardDiscard: [],
       upgrades: options.content.upgrades ?? [],
+      objectives,
+      raidDamage: {},
       round: {
         number: 1,
         maximum: options.maximumRounds ?? 6,
@@ -359,6 +479,22 @@ function currentFace(die: Die): DieFace | null {
   return die.rolledFaceIndex === null
     ? null
     : (die.faces[die.rolledFaceIndex] ?? null);
+}
+
+/**
+ * The value a die actually acts with: its rolled face plus any temporary boost
+ * from a card. Every rule that reads a die's number goes through here so a
+ * boosted die clears gates, wins bumps, and hits monsters at its real strength.
+ */
+export function dieValue(die: Die): number {
+  const face = currentFace(die);
+  return face === null ? 0 : face.value + (die.valueBonus ?? 0);
+}
+
+/** A boosted die can strike critically, the same as a natural six. */
+function isCriticalStrike(die: Die): boolean {
+  const face = currentFace(die);
+  return dieValue(die) >= 6 || (face?.symbols.includes('masterwork') ?? false);
 }
 
 function hasResources(
@@ -537,7 +673,23 @@ export function validateAction(
       message: 'That die is not available for placement.',
     };
   }
-  if (slot.occupantDieId !== null) {
+  const isBump = action.type === 'bump-die';
+  if (isBump) {
+    if (slot.occupantDieId === null) {
+      return {
+        legal: false,
+        code: 'invalid-target',
+        message: 'There is no enemy die here to bump.',
+      };
+    }
+    if (slot.occupantPlayerId === player.id) {
+      return {
+        legal: false,
+        code: 'invalid-target',
+        message: 'You already hold this slot.',
+      };
+    }
+  } else if (slot.occupantDieId !== null) {
     return {
       legal: false,
       code: 'slot-occupied',
@@ -545,14 +697,14 @@ export function validateAction(
     };
   }
 
-  const face = currentFace(die) as DieFace;
+  const value = dieValue(die);
   const reduction =
     player.factionAbilityId === 'verdant-adaptation' &&
     die.affinity === 'nature'
       ? 1
       : 0;
   const minimum = Math.max(1, (slot.requirement.minimumValue ?? 1) - reduction);
-  if (face.value < minimum) {
+  if (value < minimum) {
     return {
       legal: false,
       code: 'requirement-not-met',
@@ -569,12 +721,34 @@ export function validateAction(
       message: 'The die affinity is not accepted by this slot.',
     };
   }
-  if (!hasResources(player.resources, slot.requirement.cost)) {
+  const placementCost = isBump
+    ? mergeCosts(
+        slot.requirement.cost,
+        bumpCostFor(
+          player,
+          state.players.find((item) => item.id === slot.occupantPlayerId),
+        ),
+      )
+    : slot.requirement.cost;
+  if (!hasResources(player.resources, placementCost)) {
     return {
       legal: false,
       code: 'insufficient-resources',
-      message: 'The player cannot pay this placement cost.',
+      message: isBump
+        ? 'You cannot pay this slot cost plus the price of bumping.'
+        : 'The player cannot pay this placement cost.',
     };
+  }
+  if (isBump) {
+    const occupant = findDie(state, slot.occupantDieId);
+    const occupantValue = occupant ? dieValue(occupant) : 0;
+    if (value <= occupantValue) {
+      return {
+        legal: false,
+        code: 'requirement-not-met',
+        message: `Bumping needs a higher value than the defending die (${occupantValue}).`,
+      };
+    }
   }
   return { legal: true, action };
 }
@@ -633,14 +807,24 @@ export function enumerateLegalActions(
     if (die.status !== 'ready') continue;
     for (const location of state.locations) {
       for (const slot of location.slots) {
-        const action: GameAction = {
+        const placement: GameAction = {
           type: 'place-die',
           playerId,
           dieId: die.id,
           locationId: location.id,
           slotId: slot.id,
         };
-        if (validateAction(state, action).legal) actions.push(action);
+        if (validateAction(state, placement).legal) actions.push(placement);
+        if (slot.occupantDieId !== null && slot.occupantPlayerId !== playerId) {
+          const bump: GameAction = {
+            type: 'bump-die',
+            playerId,
+            dieId: die.id,
+            locationId: location.id,
+            slotId: slot.id,
+          };
+          if (validateAction(state, bump).legal) actions.push(bump);
+        }
       }
     }
   }
@@ -661,6 +845,96 @@ function adjustResources(
   ) as unknown as ResourcePool;
 }
 
+function mergeCosts(
+  base: Partial<ResourcePool> | undefined,
+  extra: Partial<ResourcePool>,
+): Partial<ResourcePool> {
+  const merged: Record<string, number> = { ...base };
+  for (const resource of RESOURCE_TYPES)
+    if (extra[resource])
+      merged[resource] = (merged[resource] ?? 0) + (extra[resource] ?? 0);
+  return merged as Partial<ResourcePool>;
+}
+
+function findDie(state: GameState, dieId: DieId | null): Die | null {
+  if (dieId === null) return null;
+  for (const player of state.players) {
+    const die = player.dice.find((item) => item.id === dieId);
+    if (die) return die;
+  }
+  return null;
+}
+
+function meetsObjective(
+  player: PlayerState,
+  condition: ObjectiveCondition,
+): boolean {
+  if (condition.type === 'monsters-slain')
+    return player.monstersSlain >= condition.amount;
+  if (condition.type === 'total-resource')
+    return player.resources[condition.resource] >= condition.amount;
+  if (condition.type === 'upgrades-forged')
+    return (
+      player.dice.reduce((total, die) => total + die.enhancements.length, 0) >=
+      condition.amount
+    );
+  if (condition.type === 'cards-played')
+    return player.playedCards.length >= condition.amount;
+  return (player.placementCounts[condition.tag] ?? 0) >= condition.amount;
+}
+
+/**
+ * After an action resolves, award any unclaimed shared objective the acting
+ * player now satisfies. Objectives are first-come: the earliest player to meet
+ * a condition claims its victory points for good.
+ */
+function resolveObjectives(
+  objectives: readonly ClaimableObjective[],
+  players: readonly PlayerState[],
+  playerId: PlayerId,
+  startingSequence: number,
+): {
+  readonly objectives: readonly ClaimableObjective[];
+  readonly players: readonly PlayerState[];
+  readonly events: readonly GameEvent[];
+  readonly sequence: number;
+} {
+  const player = players.find((item) => item.id === playerId);
+  if (!player)
+    return { objectives, players, events: [], sequence: startingSequence };
+  let sequence = startingSequence;
+  const events: GameEvent[] = [];
+  let victoryPoints = 0;
+  const updatedObjectives = objectives.map((objective) => {
+    if (objective.claimedBy !== null) return objective;
+    if (!meetsObjective(player, objective.condition)) return objective;
+    victoryPoints += objective.victoryPoints;
+    sequence += 1;
+    events.push({
+      type: 'objective-claimed',
+      sequence,
+      playerId,
+      objectiveId: objective.id,
+      victoryPoints: objective.victoryPoints,
+    });
+    return { ...objective, claimedBy: playerId };
+  });
+  const updatedPlayers =
+    victoryPoints > 0
+      ? players.map((item) =>
+          item.id === playerId
+            ? { ...item, victoryPoints: item.victoryPoints + victoryPoints }
+            : item,
+        )
+      : players;
+  return {
+    objectives: updatedObjectives,
+    players: updatedPlayers,
+    events,
+    sequence,
+  };
+}
+
 function scoreMatch(state: GameState): MatchResult {
   const scores = {} as Record<PlayerId, readonly ScoreBreakdown[]>;
   for (const player of state.players) {
@@ -670,17 +944,22 @@ function scoreMatch(state: GameState): MatchResult {
     );
     let factionPoints = 0;
     if (player.factionAbilityId === 'arcane-resonance')
-      factionPoints = Math.floor(player.resources.mana / 3);
+      factionPoints = Math.floor(player.resources.mana / 2);
     if (player.factionAbilityId === 'martial-glory')
       factionPoints = Math.floor((player.placementCounts.martial ?? 0) / 2);
     if (player.factionAbilityId === 'verdant-adaptation') {
-      factionPoints = Math.floor(
-        RESOURCE_TYPES.filter((resource) => player.resources[resource] > 0)
-          .length / 3,
-      );
+      // Breadth, not depth: score each resource type held in real quantity.
+      // Counting types that are merely non-zero capped this at 1 point, which
+      // made the faction's scoring rule a trap next to the other three.
+      factionPoints = RESOURCE_TYPES.filter(
+        (resource) => player.resources[resource] >= 3,
+      ).length;
     }
-    if (player.factionAbilityId === 'stonebound-craft')
-      factionPoints = Math.floor(player.resources.materials / 3);
+    if (player.factionAbilityId === 'stonebound-craft') {
+      // Stonebound already convert materials into forged faces, which score on
+      // their own and now also drive critical strikes, so hoarding pays slower.
+      factionPoints = Math.floor(player.resources.materials / 5);
+    }
     const cardPoints = player.playedCards.reduce((total, cardId) => {
       const card = state.cards.find((item) => item.id === cardId);
       return total + (card && card.category !== 'tactic' ? 1 : 0);
@@ -760,6 +1039,7 @@ function finishOrStartRound(state: GameState): TransitionResult {
     random,
     state.players.length,
     state.players.reduce((total, player) => total + player.dice.length, 0),
+    slainRaids(state.locations, state.raidDamage),
   );
   const roundSequence = state.eventSequence + 1;
   const rolled = rollPlayers(resetPlayers, random, roundSequence);
@@ -819,6 +1099,8 @@ export function applyAction(
   let cardMarket = state.cardMarket;
   let cardDiscard = state.cardDiscard;
   let rngState = state.rngState;
+  let raidDamage = state.raidDamage;
+  let objectives = state.objectives;
 
   if (action.type === 'pass') {
     sequence += 1;
@@ -855,6 +1137,9 @@ export function applyAction(
       (player) => player.id === action.playerId,
     ) as PlayerState;
     const handIndex = actingPlayer.hand.indexOf(card.id);
+    /** Resources taken from each rival this card, applied after its effects. */
+    const stolen = new Map<PlayerId, number>();
+    let stolenResource: ResourceType | null = null;
     let updatedPlayer: PlayerState = {
       ...actingPlayer,
       resources: adjustResources(actingPlayer.resources, card.cost, -1),
@@ -939,11 +1224,100 @@ export function applyAction(
           dieId: target.id,
           faceIndex,
         });
+      } else if (effect.type === 'boost-die' && action.targetDieId) {
+        const target = updatedPlayer.dice.find(
+          (die) => die.id === action.targetDieId,
+        ) as Die;
+        const boosted: Die = {
+          ...target,
+          valueBonus: (target.valueBonus ?? 0) + effect.amount,
+        };
+        updatedPlayer = {
+          ...updatedPlayer,
+          dice: updatedPlayer.dice.map((die) =>
+            die.id === target.id ? boosted : die,
+          ),
+        };
+        sequence += 1;
+        events.push({
+          type: 'die-boosted',
+          sequence,
+          playerId: action.playerId,
+          dieId: target.id,
+          amount: effect.amount,
+          value: dieValue(boosted),
+        });
+      } else if (effect.type === 'damage-raid') {
+        // Siege weapons soften the beast but cannot finish it: the killing
+        // blow, and its bounty, must still be struck with a die.
+        const raid = locations.find(
+          (item) =>
+            item.encounter?.health !== undefined &&
+            (raidDamage[item.id] ?? 0) < item.encounter.health,
+        );
+        const health = raid?.encounter?.health;
+        if (raid && health !== undefined) {
+          const already = raidDamage[raid.id] ?? 0;
+          const total = Math.min(health - 1, already + effect.amount);
+          if (total > already) {
+            raidDamage = { ...raidDamage, [raid.id]: total };
+            sequence += 1;
+            events.push({
+              type: 'raid-damaged',
+              sequence,
+              playerId: action.playerId,
+              locationId: raid.id,
+              beast: raid.encounter?.beasts[0] ?? raid.name,
+              damage: total - already,
+              remaining: health - total,
+              health,
+            });
+          }
+        }
+      } else if (effect.type === 'steal-resource') {
+        for (const rival of players) {
+          if (rival.id === action.playerId) continue;
+          const taken = Math.min(
+            effect.amount,
+            rival.resources[effect.resource],
+          );
+          if (taken <= 0) continue;
+          stolen.set(rival.id, (stolen.get(rival.id) ?? 0) + taken);
+          updatedPlayer = {
+            ...updatedPlayer,
+            resources: adjustResources(
+              updatedPlayer.resources,
+              { [effect.resource]: taken },
+              1,
+            ),
+          };
+          sequence += 1;
+          events.push({
+            type: 'resource-stolen',
+            sequence,
+            playerId: action.playerId,
+            victimPlayerId: rival.id,
+            resource: effect.resource,
+            amount: taken,
+          });
+        }
+        stolenResource = effect.resource;
       }
     }
-    players = players.map((player) =>
-      player.id === action.playerId ? updatedPlayer : player,
-    );
+    players = players.map((player) => {
+      if (player.id === action.playerId) return updatedPlayer;
+      const loss = stolen.get(player.id);
+      return loss && stolenResource
+        ? {
+            ...player,
+            resources: adjustResources(
+              player.resources,
+              { [stolenResource]: loss },
+              -1,
+            ),
+          }
+        : player;
+    });
     cardDiscard = [...cardDiscard, card.id];
   } else if (action.type === 'upgrade-die') {
     const upgrade = state.upgrades.find(
@@ -976,7 +1350,8 @@ export function applyAction(
       faceIndex: action.faceIndex,
       upgradeId: action.upgradeId,
     });
-  } else if (action.type === 'place-die') {
+  } else if (action.type === 'place-die' || action.type === 'bump-die') {
+    const isBump = action.type === 'bump-die';
     const location = locations.find(
       (item) => item.id === action.locationId,
     ) as BoardLocation;
@@ -987,7 +1362,17 @@ export function applyAction(
     const die = actingPlayer.dice.find(
       (item) => item.id === action.dieId,
     ) as Die;
-    const cost = slot?.requirement.cost ?? {};
+    const victimPlayerId = isBump ? (slot?.occupantPlayerId ?? null) : null;
+    const victimDieId = isBump ? (slot?.occupantDieId ?? null) : null;
+    const cost = isBump
+      ? mergeCosts(
+          slot?.requirement.cost,
+          bumpCostFor(
+            actingPlayer,
+            players.find((item) => item.id === victimPlayerId),
+          ),
+        )
+      : (slot?.requirement.cost ?? {});
     let reward = location.reward;
     const bonus: Partial<Record<(typeof RESOURCE_TYPES)[number], number>> = {};
     let bonusPoints = 0;
@@ -1001,10 +1386,9 @@ export function applyAction(
     }
     if (
       actingPlayer.factionAbilityId === 'arcane-resonance' &&
-      die.affinity === 'arcane' &&
       location.tags.includes('arcane')
     )
-      bonus.mana = 1;
+      bonus.mana = (bonus.mana ?? 0) + (die.affinity === 'arcane' ? 2 : 1);
     if (
       actingPlayer.factionAbilityId === 'stonebound-craft' &&
       location.tags.includes('forge')
@@ -1016,6 +1400,65 @@ export function applyAction(
       location.tags.includes('martial')
     )
       bonusPoints = 1;
+
+    // Combat. A hunt slays the beast guarding each slot, paying overkill loot
+    // and a critical bonus. A raid instead chips a shared health pool that
+    // carries across rounds; the blow that empties it wins the bounty.
+    let slainBeast: string | null = null;
+    let overkill = 0;
+    let critical = false;
+    let raidChip: {
+      readonly beast: string;
+      readonly damage: number;
+      readonly remaining: number;
+      readonly health: number;
+    } | null = null;
+    if (location.encounter) {
+      const encounter = location.encounter;
+      const slotIndex = location.slots.findIndex(
+        (item) => item.id === action.slotId,
+      );
+      const reduction =
+        actingPlayer.factionAbilityId === 'verdant-adaptation' &&
+        die.affinity === 'nature'
+          ? 1
+          : 0;
+      const threat = Math.max(
+        1,
+        (slot?.requirement.minimumValue ?? 1) - reduction,
+      );
+      critical = isCriticalStrike(die);
+      if (encounter.health !== undefined) {
+        const health = encounter.health;
+        const already = raidDamage[location.id] ?? 0;
+        if (already < health) {
+          const damage = raidDamageFor(actingPlayer, die);
+          const total = Math.min(health, already + damage);
+          raidDamage = { ...raidDamage, [location.id]: total };
+          const beast = encounter.beasts[0] ?? encounter.title;
+          if (total >= health) {
+            slainBeast = beast;
+            if (encounter.bounty) {
+              bonusPoints += encounter.bounty.victoryPoints;
+              for (const resource of RESOURCE_TYPES) {
+                const amount = encounter.bounty.loot?.[resource] ?? 0;
+                if (amount) bonus[resource] = (bonus[resource] ?? 0) + amount;
+              }
+            }
+          } else {
+            raidChip = { beast, damage, remaining: health - total, health };
+          }
+        }
+      } else {
+        overkill = Math.max(0, dieValue(die) - threat);
+        if (overkill > 0)
+          bonus[encounter.loot] = (bonus[encounter.loot] ?? 0) + overkill;
+        if (critical) bonusPoints += encounter.criticalBonus;
+        slainBeast = encounter.beasts[slotIndex] ?? encounter.title;
+      }
+    }
+    const slewMonster = slainBeast !== null;
+
     reward = {
       ...reward,
       ...Object.fromEntries(
@@ -1027,28 +1470,47 @@ export function applyAction(
     };
 
     players = players.map((player) => {
-      if (player.id !== action.playerId) return player;
-      const placementCounts = { ...player.placementCounts };
-      for (const tag of location.tags)
-        placementCounts[tag] = (placementCounts[tag] ?? 0) + 1;
-      return {
-        ...player,
-        resources: adjustResources(
-          adjustResources(player.resources, cost, -1),
-          reward,
-          1,
-        ),
-        victoryPoints:
-          player.victoryPoints +
-          (location.reward.victoryPoints ?? 0) +
-          bonusPoints,
-        placementCounts,
-        dice: player.dice.map((item) =>
-          item.id === action.dieId
-            ? { ...item, status: 'placed' as const }
-            : item,
-        ),
-      };
+      if (player.id === action.playerId) {
+        const placementCounts = { ...player.placementCounts };
+        for (const tag of location.tags)
+          placementCounts[tag] = (placementCounts[tag] ?? 0) + 1;
+        return {
+          ...player,
+          resources: adjustResources(
+            adjustResources(player.resources, cost, -1),
+            reward,
+            1,
+          ),
+          victoryPoints:
+            player.victoryPoints +
+            (location.reward.victoryPoints ?? 0) +
+            bonusPoints,
+          placementCounts,
+          monstersSlain: player.monstersSlain + (slewMonster ? 1 : 0),
+          dice: player.dice.map((item) =>
+            item.id === action.dieId
+              ? { ...item, status: 'placed' as const }
+              : item,
+          ),
+        };
+      }
+      if (isBump && player.id === victimPlayerId) {
+        // Verdant bends rather than breaks: being driven off a slot still
+        // yields them something for the trouble.
+        const resilient = player.factionAbilityId === 'verdant-adaptation';
+        return {
+          ...player,
+          resources: resilient
+            ? adjustResources(player.resources, { influence: 1 }, 1)
+            : player.resources,
+          dice: player.dice.map((item) =>
+            item.id === victimDieId
+              ? { ...item, status: 'ready' as const }
+              : item,
+          ),
+        };
+      }
+      return player;
     });
     locations = locations.map((item) =>
       item.id === action.locationId
@@ -1066,6 +1528,18 @@ export function applyAction(
           }
         : item,
     );
+    if (isBump && victimPlayerId && victimDieId) {
+      sequence += 1;
+      events.push({
+        type: 'die-bumped',
+        sequence,
+        playerId: action.playerId,
+        victimPlayerId,
+        dieId: victimDieId,
+        locationId: action.locationId,
+        slotId: action.slotId,
+      });
+    }
     sequence += 1;
     events.push({
       type: 'die-placed',
@@ -1075,6 +1549,32 @@ export function applyAction(
       locationId: action.locationId,
       slotId: action.slotId,
     });
+    if (slainBeast) {
+      sequence += 1;
+      events.push({
+        type: 'monster-slain',
+        sequence,
+        playerId: action.playerId,
+        locationId: action.locationId,
+        beast: slainBeast,
+        overkill,
+        critical,
+        bonusVictoryPoints: (location.reward.victoryPoints ?? 0) + bonusPoints,
+      });
+    }
+    if (raidChip) {
+      sequence += 1;
+      events.push({
+        type: 'raid-damaged',
+        sequence,
+        playerId: action.playerId,
+        locationId: action.locationId,
+        beast: raidChip.beast,
+        damage: raidChip.damage,
+        remaining: raidChip.remaining,
+        health: raidChip.health,
+      });
+    }
     for (const resource of RESOURCE_TYPES) {
       const amount = reward[resource] ?? 0;
       if (amount > 0) {
@@ -1100,6 +1600,17 @@ export function applyAction(
     }
   }
 
+  const objectiveOutcome = resolveObjectives(
+    objectives,
+    players,
+    action.playerId,
+    sequence,
+  );
+  objectives = objectiveOutcome.objectives;
+  players = objectiveOutcome.players;
+  sequence = objectiveOutcome.sequence;
+  events.push(...objectiveOutcome.events);
+
   const intermediate: GameState = {
     ...state,
     players,
@@ -1108,6 +1619,8 @@ export function applyAction(
     cardMarket,
     cardDiscard,
     rngState,
+    objectives,
+    raidDamage,
     eventSequence: sequence,
   };
   const activePlayerId = nextPlayer(intermediate, action.playerId);
@@ -1141,20 +1654,23 @@ export function deserializeGame(serialized: string): GameState {
     throw new Error('Saved game must be an object.');
   const candidate = value as Partial<GameState>;
   if (
-    candidate.schemaVersion !== 3 ||
+    candidate.schemaVersion !== 4 ||
     !Array.isArray(candidate.players) ||
     !Array.isArray(candidate.locations) ||
     !Array.isArray(candidate.cards) ||
     !Array.isArray(candidate.cardDeck) ||
     !Array.isArray(candidate.cardMarket) ||
     !Array.isArray(candidate.cardDiscard) ||
-    !Array.isArray(candidate.upgrades)
+    !Array.isArray(candidate.upgrades) ||
+    !Array.isArray(candidate.objectives)
   ) {
     throw new Error('Saved game has an unsupported or invalid schema.');
   }
   if (
     typeof candidate.rngState !== 'number' ||
-    candidate.result === undefined
+    candidate.result === undefined ||
+    typeof candidate.raidDamage !== 'object' ||
+    candidate.raidDamage === null
   ) {
     throw new Error('Saved game is missing deterministic state.');
   }

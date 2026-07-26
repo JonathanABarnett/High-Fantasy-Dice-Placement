@@ -123,6 +123,15 @@ select {
   font-size: 0.85rem;
   line-height: 1.5;
 }
+.ability.scoring {
+  min-height: 0;
+  margin-top: 0.35rem;
+  color: #8d8171;
+  font-size: 0.78rem;
+}
+.ability.scoring strong {
+  color: #c2a570;
+}
 .button-row {
   display: flex;
   flex-wrap: wrap;
@@ -837,6 +846,140 @@ select {
   margin-top: 0.1rem;
   color: #d1a866;
   font-style: normal;
+}
+.encounter-banner {
+  margin: 0.55rem 0 0.2rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid #8a4130;
+  border-radius: 0.4rem;
+  background: linear-gradient(180deg, rgb(87 26 22 / 55%), rgb(40 20 16 / 45%));
+}
+.encounter-banner strong {
+  display: block;
+  color: #f0b088 !important;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.encounter-banner p {
+  margin: 0.25rem 0 0;
+  color: #d8b7a2 !important;
+  font-size: 0.62rem !important;
+  line-height: 1.35;
+}
+.slot-preview .beast-tag {
+  grid-column: 1 / -1;
+  color: #f0b48c;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+.preview-slots em.slay-projection {
+  color: #ffcf8a;
+  font-weight: 800;
+}
+.preview-slots em.bump-projection {
+  color: #ffd98a;
+  font-weight: 700;
+}
+.slot-preview.bumpable {
+  border-color: #b08328;
+  background: rgb(94 68 16 / 32%);
+}
+.slot-preview.bumpable > strong {
+  color: #ffd24a;
+}
+.encounter-banner.raid {
+  border-color: #a2452f;
+}
+.die.boosted {
+  border-color: #e0b74a;
+  box-shadow: 0 0 0 1px rgb(224 183 74 / 55%);
+}
+.die-boost {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.3rem;
+  color: #ffd766;
+  font-size: 0.6rem;
+  font-weight: 900;
+}
+.raid-bar {
+  height: 0.5rem;
+  margin: 0.4rem 0 0.35rem;
+  overflow: hidden;
+  border: 1px solid #7a4a30;
+  border-radius: 0.3rem;
+  background: #1d1512;
+}
+.raid-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 0.25rem;
+  background: linear-gradient(90deg, #d6483c, #f08050);
+}
+.raid-health {
+  color: #ffb59a !important;
+}
+.quest-panel {
+  margin-top: 0.8rem;
+  padding: 0.6rem 0.65rem;
+  border: 1px solid #4a3f2e;
+  border-radius: 0.5rem;
+  background: #171410;
+}
+.quest-list {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.quest {
+  padding: 0.45rem 0.55rem;
+  border: 1px solid #40372d;
+  border-left: 3px solid #6d5c3c;
+  border-radius: 0.35rem;
+  background: #1a1713;
+}
+.quest-title {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  justify-content: space-between;
+}
+.quest-title strong {
+  color: #e8c98a;
+  font-size: 0.72rem;
+}
+.quest p {
+  margin: 0.2rem 0 0;
+  color: #b3a68f;
+  font-size: 0.64rem;
+  line-height: 1.35;
+}
+.quest em {
+  display: block;
+  margin-top: 0.25rem;
+  color: #8a7c65;
+  font-size: 0.6rem;
+  font-style: normal;
+  font-weight: 700;
+}
+.quest.claimed-by-you {
+  border-left-color: #3c8e61;
+  background: rgb(27 74 49 / 28%);
+}
+.quest.claimed-by-you em {
+  color: #8ff0b6;
+}
+.quest.claimed-by-rival {
+  border-left-color: #8d4a3e;
+  background: rgb(74 32 27 / 26%);
+}
+.quest.claimed-by-rival em {
+  color: #df9e90;
 }
 .accessible-actions {
   margin-top: 0.8rem;

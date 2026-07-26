@@ -2,9 +2,12 @@ export { SeededRandom } from './random/seeded-random.js';
 export type { RandomSnapshot } from './random/seeded-random.js';
 export {
   applyAction,
+  bumpCostFor,
   createGame,
   deserializeGame,
+  dieValue,
   enumerateLegalActions,
+  raidDamageFor,
   serializeGame,
   validateAction,
 } from './match.js';

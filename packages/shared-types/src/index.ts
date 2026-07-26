@@ -46,6 +46,12 @@ export interface Die {
   readonly rolledFaceIndex: number | null;
   readonly status: 'ready' | 'placed' | 'exhausted';
   readonly enhancements: readonly string[];
+  /**
+   * A temporary bonus added to the rolled face value by card effects. Cleared
+   * when dice are rerolled at the start of each round, so it never becomes a
+   * permanent upgrade — that is the Forge's job.
+   */
+  readonly valueBonus?: number;
 }
 
 export interface PlacementRequirement {
@@ -63,6 +69,52 @@ export interface PlacementSlot {
   readonly requirement: PlacementRequirement;
 }
 
+/**
+ * A monster hunt overlaid on a combat location. Each slot's minimum value is
+ * the beast guarding it: clearing that slot slays the beast, and the harder the
+ * rolled die beats the beast's threat, the more loot it drops. A natural six or
+ * a forged masterwork face lands a critical strike for bonus victory points.
+ */
+export interface MonsterEncounter {
+  /** Display title for the hunting ground, e.g. "Dragon Pass". */
+  readonly title: string;
+  /** One beast name per slot, aligned to the location's slot order. */
+  readonly beasts: readonly string[];
+  /** Resource dropped once per point the rolled value beats the beast's threat. */
+  readonly loot: ResourceType;
+  /** Bonus victory points added when the slaying die lands a critical strike. */
+  readonly criticalBonus: number;
+  /**
+   * Total health of a persistent raid boss. When present, the location is a
+   * multi-round raid: every die placed at either slot deals damage (its value,
+   * doubled on a critical strike) to a shared pool that carries across rounds,
+   * and the blow that empties the pool wins the bounty. When absent, the
+   * location is a single-die hunt where each slot is its own beast.
+   */
+  readonly health?: number;
+  /** Killing-blow reward for a raid boss, granted to the finisher. */
+  readonly bounty?: {
+    readonly victoryPoints: number;
+    readonly loot?: Partial<ResourcePool>;
+  };
+}
+
+/** A data-driven, deterministic objective condition the engine can evaluate. */
+export type ObjectiveCondition =
+  | { readonly type: 'monsters-slain'; readonly amount: number }
+  | {
+      readonly type: 'total-resource';
+      readonly resource: ResourceType;
+      readonly amount: number;
+    }
+  | { readonly type: 'upgrades-forged'; readonly amount: number }
+  | { readonly type: 'cards-played'; readonly amount: number }
+  | {
+      readonly type: 'tag-placements';
+      readonly tag: string;
+      readonly amount: number;
+    };
+
 export interface BoardLocation {
   readonly id: LocationId;
   readonly name: string;
@@ -72,6 +124,8 @@ export interface BoardLocation {
   readonly slots: readonly PlacementSlot[];
   readonly tags: readonly string[];
   readonly reward: Partial<ResourcePool> & { readonly victoryPoints?: number };
+  /** Optional monster hunt. Present only on combat locations. */
+  readonly encounter?: MonsterEncounter;
 }
 
 export type GameEffect =
@@ -82,7 +136,17 @@ export type GameEffect =
     }
   | { readonly type: 'reroll-die' }
   | { readonly type: 'draw-card'; readonly amount: number }
-  | { readonly type: 'gain-victory-points'; readonly amount: number };
+  | { readonly type: 'gain-victory-points'; readonly amount: number }
+  /** Raise a ready die's value for this round, to clear gates or hit harder. */
+  | { readonly type: 'boost-die'; readonly amount: number }
+  /** Wound the raid boss without spending a die on it. */
+  | { readonly type: 'damage-raid'; readonly amount: number }
+  /** Take a resource from every rival, to the limit of what they hold. */
+  | {
+      readonly type: 'steal-resource';
+      readonly resource: ResourceType;
+      readonly amount: number;
+    };
 
 export interface Card {
   readonly id: CardId;
@@ -109,6 +173,12 @@ export interface Objective {
   readonly name: string;
   readonly description: string;
   readonly victoryPoints: number;
+  readonly condition: ObjectiveCondition;
+}
+
+/** A shared objective in a live match, plus who (if anyone) has claimed it. */
+export interface ClaimableObjective extends Objective {
+  readonly claimedBy: PlayerId | null;
 }
 
 export interface FactionDefinition {
@@ -140,6 +210,7 @@ export interface PlayerState {
   readonly victoryPoints: number;
   readonly hasPassed: boolean;
   readonly placementCounts: Readonly<Record<string, number>>;
+  readonly monstersSlain: number;
 }
 
 export interface RoundState {
@@ -155,7 +226,7 @@ export interface TurnState {
 }
 
 export interface GameState {
-  readonly schemaVersion: 3;
+  readonly schemaVersion: 4;
   readonly id: GameId;
   readonly seed: string;
   readonly rngState: number;
@@ -167,6 +238,10 @@ export interface GameState {
   readonly cardMarket: readonly CardId[];
   readonly cardDiscard: readonly CardId[];
   readonly upgrades: readonly UpgradeDefinition[];
+  /** Shared objectives for the match, with claim status. */
+  readonly objectives: readonly ClaimableObjective[];
+  /** Accumulated damage on persistent raid bosses, keyed by location id. */
+  readonly raidDamage: Readonly<Record<string, number>>;
   readonly round: RoundState;
   readonly turn: TurnState;
   readonly eventSequence: number;
@@ -176,6 +251,13 @@ export interface GameState {
 export type GameAction =
   | {
       readonly type: 'place-die';
+      readonly playerId: PlayerId;
+      readonly dieId: DieId;
+      readonly locationId: LocationId;
+      readonly slotId: SlotId;
+    }
+  | {
+      readonly type: 'bump-die';
       readonly playerId: PlayerId;
       readonly dieId: DieId;
       readonly locationId: LocationId;
@@ -269,6 +351,59 @@ export type GameEvent =
       readonly dieId: DieId;
       readonly faceIndex: number;
       readonly upgradeId: UpgradeId;
+    }
+  | {
+      readonly type: 'monster-slain';
+      readonly sequence: number;
+      readonly playerId: PlayerId;
+      readonly locationId: LocationId;
+      readonly beast: string;
+      /** Points by which the rolled value beat the beast's threat. */
+      readonly overkill: number;
+      readonly critical: boolean;
+      readonly bonusVictoryPoints: number;
+    }
+  | {
+      readonly type: 'raid-damaged';
+      readonly sequence: number;
+      readonly playerId: PlayerId;
+      readonly locationId: LocationId;
+      readonly beast: string;
+      readonly damage: number;
+      readonly remaining: number;
+      readonly health: number;
+    }
+  | {
+      readonly type: 'die-bumped';
+      readonly sequence: number;
+      readonly playerId: PlayerId;
+      readonly victimPlayerId: PlayerId;
+      readonly dieId: DieId;
+      readonly locationId: LocationId;
+      readonly slotId: SlotId;
+    }
+  | {
+      readonly type: 'objective-claimed';
+      readonly sequence: number;
+      readonly playerId: PlayerId;
+      readonly objectiveId: ObjectiveId;
+      readonly victoryPoints: number;
+    }
+  | {
+      readonly type: 'die-boosted';
+      readonly sequence: number;
+      readonly playerId: PlayerId;
+      readonly dieId: DieId;
+      readonly amount: number;
+      readonly value: number;
+    }
+  | {
+      readonly type: 'resource-stolen';
+      readonly sequence: number;
+      readonly playerId: PlayerId;
+      readonly victimPlayerId: PlayerId;
+      readonly resource: ResourceType;
+      readonly amount: number;
     };
 
 export interface ScoreBreakdown {

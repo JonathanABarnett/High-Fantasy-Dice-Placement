@@ -8,6 +8,7 @@ import type {
   FactionId,
   GameAction,
   LocationId,
+  ObjectiveId,
   PlayerId,
   SlotId,
   UpgradeDefinition,
@@ -18,6 +19,7 @@ import {
   applyAction,
   createGame,
   deserializeGame,
+  dieValue,
   enumerateLegalActions,
   serializeGame,
   validateAction,
@@ -375,11 +377,705 @@ describe('headless match', () => {
       (player) => player.id === human.id,
     )!;
     expect(updated.resources.gold).toBe(1);
-    expect(updated.resources.mana).toBe(4);
+    // 1 starting + 2 location reward + 2 Arcanum resonance for an Arcane die.
+    expect(updated.resources.mana).toBe(5);
     expect(updated.victoryPoints).toBe(1);
     expect(result.events.map((event) => event.sequence)).toEqual(
       [...result.events.map((event) => event.sequence)].sort((a, b) => a - b),
     );
+  });
+
+  it('slays monsters with scaled overkill loot and critical strikes', () => {
+    const huntLocations: readonly BoardLocation[] = [
+      {
+        id: 'dragon-lair' as LocationId,
+        name: 'Dragon Lair',
+        description: 'Beasts guard the pass.',
+        tags: ['martial', 'combat'],
+        reward: { victoryPoints: 1 },
+        encounter: {
+          title: 'Dragon Lair',
+          beasts: ['Wyvern', 'Elder Dragon'],
+          loot: 'gold',
+          criticalBonus: 3,
+        },
+        slots: [
+          {
+            id: 'lair-1' as SlotId,
+            occupantDieId: null,
+            occupantPlayerId: null,
+            requirement: { minimumValue: 4 },
+          },
+          {
+            id: 'lair-2' as SlotId,
+            occupantDieId: null,
+            occupantPlayerId: null,
+            requirement: { minimumValue: 6 },
+          },
+        ],
+      },
+      {
+        id: 'meadow' as LocationId,
+        name: 'Meadow',
+        description: 'A calm field keeps low rolls useful.',
+        tags: ['nature'],
+        reward: { gold: 1 },
+        slots: [
+          {
+            id: 'meadow-1' as SlotId,
+            occupantDieId: null,
+            occupantPlayerId: null,
+            requirement: {},
+          },
+          {
+            id: 'meadow-2' as SlotId,
+            occupantDieId: null,
+            occupantPlayerId: null,
+            requirement: {},
+          },
+        ],
+      },
+    ];
+
+    const hunt = (faceIndex: number, slotId: string) => {
+      const base = createGame({
+        seed: 'monster-hunt',
+        humanFactionId: factions[0]!.id,
+        cpuFactionId: factions[1]!.id,
+        content: { factions, locations: huntLocations, cards, upgrades },
+      }).state;
+      const human = base.players[0]!;
+      const attacker = human.dice[0]!;
+      const state = {
+        ...base,
+        players: base.players.map((player) =>
+          player.id === human.id
+            ? {
+                ...player,
+                dice: player.dice.map((die) =>
+                  die.id === attacker.id
+                    ? { ...die, rolledFaceIndex: faceIndex }
+                    : die,
+                ),
+              }
+            : player,
+        ),
+      };
+      return applyAction(state, {
+        type: 'place-die',
+        playerId: human.id,
+        dieId: attacker.id,
+        locationId: 'dragon-lair' as LocationId,
+        slotId: slotId as SlotId,
+      });
+    };
+
+    // Value 6 into the threat-4 Wyvern: overkill 2 loots +2 gold, and the
+    // natural six lands a critical strike for +3 victory points.
+    const crit = hunt(5, 'lair-1');
+    const critPlayer = crit.state.players.find(
+      (player) => player.id === ('player-human' as PlayerId),
+    )!;
+    expect(critPlayer.resources.gold).toBe(2 + 2);
+    expect(critPlayer.victoryPoints).toBe(1 + 3);
+    expect(crit.events).toContainEqual(
+      expect.objectContaining({
+        type: 'monster-slain',
+        beast: 'Wyvern',
+        overkill: 2,
+        critical: true,
+      }),
+    );
+
+    // Value 5 into the threat-4 Wyvern: overkill 1 loots +1 gold with no crit.
+    const grind = hunt(4, 'lair-1');
+    const grindPlayer = grind.state.players.find(
+      (player) => player.id === ('player-human' as PlayerId),
+    )!;
+    expect(grindPlayer.resources.gold).toBe(2 + 1);
+    expect(grindPlayer.victoryPoints).toBe(1);
+    expect(grind.events).toContainEqual(
+      expect.objectContaining({
+        type: 'monster-slain',
+        beast: 'Wyvern',
+        overkill: 1,
+        critical: false,
+      }),
+    );
+  });
+
+  it('wounds a raid boss across turns and pays the killing blow', () => {
+    const raidLocations: readonly BoardLocation[] = [
+      {
+        id: 'raid-pass' as LocationId,
+        name: 'Raid Pass',
+        description: 'A persistent boss.',
+        tags: ['martial', 'combat'],
+        reward: { influence: 1 },
+        encounter: {
+          title: 'Raid Pass',
+          beasts: ['Elder Dragon'],
+          loot: 'gold',
+          criticalBonus: 0,
+          health: 10,
+          bounty: { victoryPoints: 6, loot: { gold: 3 } },
+        },
+        slots: [
+          {
+            id: 'raid-a' as SlotId,
+            occupantDieId: null,
+            occupantPlayerId: null,
+            requirement: {},
+          },
+          {
+            id: 'raid-b' as SlotId,
+            occupantDieId: null,
+            occupantPlayerId: null,
+            requirement: {},
+          },
+        ],
+      },
+    ];
+    const start = createGame({
+      seed: 'raid-test',
+      humanFactionId: factions[0]!.id,
+      cpuFactionId: factions[1]!.id,
+      content: { factions, locations: raidLocations, cards, upgrades },
+    }).state;
+    const human = start.players[0]!;
+
+    const withFace = (
+      state: typeof start,
+      dieIndex: number,
+      faceIndex: number,
+    ) => ({
+      ...state,
+      turn: { ...state.turn, activePlayerId: human.id },
+      players: state.players.map((player) =>
+        player.id === human.id
+          ? {
+              ...player,
+              dice: player.dice.map((die, index) =>
+                index === dieIndex
+                  ? {
+                      ...die,
+                      rolledFaceIndex: faceIndex,
+                      status: 'ready' as const,
+                    }
+                  : die,
+              ),
+            }
+          : player,
+      ),
+    });
+
+    // A value-4 die chips the 10-health boss without killing it.
+    const chipState = withFace(start, 0, 3);
+    const chip = applyAction(chipState, {
+      type: 'place-die',
+      playerId: human.id,
+      dieId: human.dice[0]!.id,
+      locationId: 'raid-pass' as LocationId,
+      slotId: 'raid-a' as SlotId,
+    });
+    expect(chip.state.raidDamage['raid-pass']).toBe(4);
+    expect(chip.events).toContainEqual(
+      expect.objectContaining({
+        type: 'raid-damaged',
+        damage: 4,
+        remaining: 6,
+      }),
+    );
+    expect(chip.events.some((event) => event.type === 'monster-slain')).toBe(
+      false,
+    );
+
+    // A natural six doubles to 12 damage, finishing the boss and taking the
+    // bounty: 6 victory points plus 3 gold from the hoard.
+    const finishState = withFace(chip.state, 1, 5);
+    const finish = applyAction(finishState, {
+      type: 'place-die',
+      playerId: human.id,
+      dieId: human.dice[1]!.id,
+      locationId: 'raid-pass' as LocationId,
+      slotId: 'raid-b' as SlotId,
+    });
+    expect(finish.state.raidDamage['raid-pass']).toBe(10);
+    const slayer = finish.state.players.find((p) => p.id === human.id)!;
+    expect(slayer.monstersSlain).toBe(1);
+    expect(finish.events).toContainEqual(
+      expect.objectContaining({
+        type: 'monster-slain',
+        beast: 'Elder Dragon',
+        critical: true,
+      }),
+    );
+    // 6 bounty points, and gold rose by the 3-gold hoard.
+    const before = chip.state.players.find((p) => p.id === human.id)!;
+    expect(slayer.victoryPoints - before.victoryPoints).toBe(6);
+    expect(slayer.resources.gold - before.resources.gold).toBe(3);
+  });
+
+  it('bumps an enemy die with a higher value and returns it ready', () => {
+    const base = game();
+    const human = base.players[0]!;
+    // Pin the contested values: the defender rolls 3, the challenger 5.
+    const state = {
+      ...base,
+      players: base.players.map((player, playerIndex) => ({
+        ...player,
+        dice: player.dice.map((die, dieIndex) =>
+          dieIndex === 0
+            ? { ...die, rolledFaceIndex: playerIndex === 0 ? 2 : 4 }
+            : die,
+        ),
+      })),
+    };
+    const placed = applyAction(state, {
+      type: 'place-die',
+      playerId: human.id,
+      dieId: human.dice[0]!.id,
+      locationId: locations[0]!.id,
+      slotId: locations[0]!.slots[0]!.id,
+    }).state;
+    const cpu = placed.players[1]!;
+
+    // Equal or lower values cannot take a held slot; only a strictly higher one.
+    const weakBump: GameAction = {
+      type: 'bump-die',
+      playerId: cpu.id,
+      dieId: cpu.dice[1]!.id,
+      locationId: locations[0]!.id,
+      slotId: locations[0]!.slots[0]!.id,
+    };
+    const weakState = {
+      ...placed,
+      players: placed.players.map((player) =>
+        player.id === cpu.id
+          ? {
+              ...player,
+              dice: player.dice.map((die, index) =>
+                index === 1 ? { ...die, rolledFaceIndex: 2 } : die,
+              ),
+            }
+          : player,
+      ),
+    };
+    expect(validateAction(weakState, weakBump)).toMatchObject({
+      legal: false,
+      code: 'requirement-not-met',
+    });
+
+    const bump: GameAction = {
+      type: 'bump-die',
+      playerId: cpu.id,
+      dieId: cpu.dice[0]!.id,
+      locationId: locations[0]!.id,
+      slotId: locations[0]!.slots[0]!.id,
+    };
+    expect(validateAction(placed, bump).legal).toBe(true);
+
+    const bumped = applyAction(placed, bump);
+    const slot = bumped.state.locations
+      .find((item) => item.id === locations[0]!.id)!
+      .slots.find((item) => item.id === locations[0]!.slots[0]!.id)!;
+    expect(slot.occupantPlayerId).toBe(cpu.id);
+    // The victim's die comes back ready to be used again, not destroyed.
+    const victimDie = bumped.state.players
+      .find((player) => player.id === human.id)!
+      .dice.find((die) => die.id === human.dice[0]!.id)!;
+    expect(victimDie.status).toBe('ready');
+    expect(bumped.events).toContainEqual(
+      expect.objectContaining({
+        type: 'die-bumped',
+        victimPlayerId: human.id,
+      }),
+    );
+  });
+
+  it('gives each faction its own grip on combat and displacement', () => {
+    const verdant: FactionDefinition = {
+      id: 'test-verdant' as FactionId,
+      name: 'Test Verdant',
+      passiveAbilityId: 'verdant-adaptation',
+      passiveAbility: 'Adapt',
+      roundAbility: 'None',
+      startingCardId: 'card-a' as CardId,
+      scoringRule: 'Breadth',
+    };
+    const ember: FactionDefinition = {
+      id: 'test-ember' as FactionId,
+      name: 'Test Ember',
+      passiveAbilityId: 'martial-glory',
+      passiveAbility: 'Glory',
+      roundAbility: 'None',
+      startingCardId: 'card-b' as CardId,
+      scoringRule: 'Martial',
+    };
+    const roster = [...factions, verdant, ember];
+
+    // Verdant fields a sixth die; the other factions field five.
+    const verdantGame = createGame({
+      seed: 'faction-abilities',
+      humanFactionId: verdant.id,
+      cpuFactionId: factions[1]!.id,
+      content: { factions: roster, locations, cards, upgrades },
+    }).state;
+    expect(verdantGame.players[0]!.dice).toHaveLength(6);
+    expect(verdantGame.players[1]!.dice).toHaveLength(5);
+
+    // Ember adds flat damage to a raid boss on top of the doubled critical.
+    const raid: readonly BoardLocation[] = [
+      {
+        id: 'boss' as LocationId,
+        name: 'Boss',
+        description: 'A raid.',
+        tags: ['martial', 'combat'],
+        reward: {},
+        encounter: {
+          title: 'Boss',
+          beasts: ['Wyrm'],
+          loot: 'gold',
+          criticalBonus: 0,
+          health: 40,
+          bounty: { victoryPoints: 1 },
+        },
+        slots: [
+          {
+            id: 'boss-a' as SlotId,
+            occupantDieId: null,
+            occupantPlayerId: null,
+            requirement: {},
+          },
+        ],
+      },
+    ];
+    const strike = (factionId: FactionId) => {
+      const base = createGame({
+        seed: 'raid-damage',
+        humanFactionId: factionId,
+        cpuFactionId: factions[0]!.id,
+        content: { factions: roster, locations: raid, cards, upgrades },
+      }).state;
+      const attacker = base.players[0]!;
+      const pinned = {
+        ...base,
+        players: base.players.map((player) =>
+          player.id === attacker.id
+            ? {
+                ...player,
+                dice: player.dice.map((die, index) =>
+                  index === 0 ? { ...die, rolledFaceIndex: 3 } : die,
+                ),
+              }
+            : player,
+        ),
+      };
+      return applyAction(pinned, {
+        type: 'place-die',
+        playerId: attacker.id,
+        dieId: attacker.dice[0]!.id,
+        locationId: 'boss' as LocationId,
+        slotId: 'boss-a' as SlotId,
+      }).state.raidDamage['boss'];
+    };
+    // A value-4 die: 4 damage normally, 6 for Ember's martial glory.
+    expect(strike(factions[0]!.id)).toBe(4);
+    expect(strike(ember.id)).toBe(6);
+  });
+
+  it('prices bumping by attacker and defender faction', () => {
+    const stonebound = factions[1]!;
+    const arcanum = factions[0]!;
+    const base = createGame({
+      seed: 'bump-pricing',
+      humanFactionId: arcanum.id,
+      cpuFactionId: stonebound.id,
+      content: { factions, locations, cards, upgrades },
+    }).state;
+    // Defender rolls 3, attacker rolls 5, so only the price differs.
+    const state = {
+      ...base,
+      players: base.players.map((player, playerIndex) => ({
+        ...player,
+        dice: player.dice.map((die, dieIndex) =>
+          dieIndex === 0
+            ? { ...die, rolledFaceIndex: playerIndex === 1 ? 2 : 4 }
+            : die,
+        ),
+      })),
+    };
+    const defender = state.players[1]!;
+    const held = applyAction(
+      { ...state, turn: { ...state.turn, activePlayerId: defender.id } },
+      {
+        type: 'place-die',
+        playerId: defender.id,
+        dieId: defender.dice[0]!.id,
+        locationId: locations[0]!.id,
+        slotId: locations[0]!.slots[0]!.id,
+      },
+    ).state;
+
+    const attacker = held.players[0]!;
+    const before = attacker.resources;
+    const bumped = applyAction(
+      { ...held, turn: { ...held.turn, activePlayerId: attacker.id } },
+      {
+        type: 'bump-die',
+        playerId: attacker.id,
+        dieId: attacker.dice[0]!.id,
+        locationId: locations[0]!.id,
+        slotId: locations[0]!.slots[0]!.id,
+      },
+    ).state;
+    const after = bumped.players.find((p) => p.id === attacker.id)!.resources;
+    // Arcanum pays in mana, and Stonebound's masonry taxes 1 extra influence.
+    expect(before.mana - after.mana).toBe(1);
+    expect(before.influence - after.influence).toBe(1);
+  });
+
+  it('boosts a die for the round, unlocking gates it could not reach', () => {
+    const boostCard: Card = {
+      id: 'boost-card' as CardId,
+      name: 'Test War Cry',
+      category: 'tactic',
+      cost: {},
+      effects: [{ type: 'boost-die', amount: 3 }],
+      rulesText: 'A ready die gains +3.',
+      target: 'ready-die',
+      marketCopies: 0,
+    };
+    const base = createGame({
+      seed: 'boost-test',
+      humanFactionId: factions[0]!.id,
+      cpuFactionId: factions[1]!.id,
+      content: { factions, locations, cards: [...cards, boostCard], upgrades },
+    }).state;
+    const human = base.players[0]!;
+    const arcane = human.dice.find((die) => die.affinity === 'arcane')!;
+    // Pin the die to a 2 and put the boost card in hand.
+    const state = {
+      ...base,
+      players: base.players.map((player) =>
+        player.id === human.id
+          ? {
+              ...player,
+              hand: [boostCard.id],
+              dice: player.dice.map((die) =>
+                die.id === arcane.id ? { ...die, rolledFaceIndex: 1 } : die,
+              ),
+            }
+          : player,
+      ),
+    };
+
+    // The vault needs a 4, so a 2 is blocked before the boost.
+    const reach: GameAction = {
+      type: 'place-die',
+      playerId: human.id,
+      dieId: arcane.id,
+      locationId: locations[1]!.id,
+      slotId: locations[1]!.slots[0]!.id,
+    };
+    expect(validateAction(state, reach)).toMatchObject({
+      legal: false,
+      code: 'requirement-not-met',
+    });
+
+    const boosted = applyAction(state, {
+      type: 'play-card',
+      playerId: human.id,
+      cardId: boostCard.id,
+      targetDieId: arcane.id,
+    });
+    const boostedDie = boosted.state.players
+      .find((player) => player.id === human.id)!
+      .dice.find((die) => die.id === arcane.id)!;
+    expect(dieValue(boostedDie)).toBe(5);
+    expect(boosted.events).toContainEqual(
+      expect.objectContaining({ type: 'die-boosted', amount: 3, value: 5 }),
+    );
+    // At value 5 the same placement is now legal.
+    expect(
+      validateAction(
+        {
+          ...boosted.state,
+          turn: { ...boosted.state.turn, activePlayerId: human.id },
+        },
+        reach,
+      ).legal,
+    ).toBe(true);
+
+    // The boost is temporary: a fresh round clears it.
+    let rolled = boosted.state;
+    for (const player of rolled.players)
+      rolled = applyAction(
+        { ...rolled, turn: { ...rolled.turn, activePlayerId: player.id } },
+        { type: 'pass', playerId: player.id },
+      ).state;
+    expect(rolled.round.number).toBe(2);
+    const freshDie = rolled.players
+      .find((player) => player.id === human.id)!
+      .dice.find((die) => die.id === arcane.id)!;
+    expect(freshDie.valueBonus ?? 0).toBe(0);
+  });
+
+  it('steals from rivals and softens but never finishes a raid boss', () => {
+    const siege: Card = {
+      id: 'siege-card' as CardId,
+      name: 'Test Ballista',
+      category: 'tactic',
+      cost: {},
+      effects: [{ type: 'damage-raid', amount: 99 }],
+      rulesText: 'Batter the boss.',
+      target: 'none',
+      marketCopies: 0,
+    };
+    const thief: Card = {
+      id: 'thief-card' as CardId,
+      name: 'Test Cutpurse',
+      category: 'ally',
+      cost: {},
+      effects: [{ type: 'steal-resource', resource: 'gold', amount: 2 }],
+      rulesText: 'Steal 2 gold.',
+      target: 'none',
+      marketCopies: 0,
+    };
+    const raidLocations: readonly BoardLocation[] = [
+      {
+        id: 'siege-pass' as LocationId,
+        name: 'Siege Pass',
+        description: 'A persistent boss.',
+        tags: ['martial', 'combat'],
+        reward: {},
+        encounter: {
+          title: 'Siege Pass',
+          beasts: ['Elder Dragon'],
+          loot: 'gold',
+          criticalBonus: 0,
+          health: 20,
+          bounty: { victoryPoints: 6 },
+        },
+        slots: [
+          {
+            id: 'siege-a' as SlotId,
+            occupantDieId: null,
+            occupantPlayerId: null,
+            requirement: {},
+          },
+        ],
+      },
+    ];
+    const base = createGame({
+      seed: 'siege-test',
+      humanFactionId: factions[0]!.id,
+      cpuFactionId: factions[1]!.id,
+      content: {
+        factions,
+        locations: raidLocations,
+        cards: [...cards, siege, thief],
+        upgrades,
+      },
+    }).state;
+    const human = base.players[0]!;
+    const state = {
+      ...base,
+      players: base.players.map((player) =>
+        player.id === human.id
+          ? { ...player, hand: [siege.id, thief.id] }
+          : player,
+      ),
+    };
+
+    // Overwhelming card damage still leaves the beast on 1 health: a die must
+    // land the killing blow, so no monster-slain event fires here.
+    const battered = applyAction(state, {
+      type: 'play-card',
+      playerId: human.id,
+      cardId: siege.id,
+    });
+    expect(battered.state.raidDamage['siege-pass']).toBe(19);
+    expect(
+      battered.events.some((event) => event.type === 'monster-slain'),
+    ).toBe(false);
+    expect(battered.events).toContainEqual(
+      expect.objectContaining({ type: 'raid-damaged', remaining: 1 }),
+    );
+
+    // Stealing moves resources between players rather than creating them.
+    const cpu = state.players[1]!;
+    const beforeThief = cpu.resources.gold;
+    const robbed = applyAction(
+      { ...state, turn: { ...state.turn, activePlayerId: human.id } },
+      { type: 'play-card', playerId: human.id, cardId: thief.id },
+    );
+    const taken = Math.min(2, beforeThief);
+    const thiefAfter = robbed.state.players.find((p) => p.id === human.id)!;
+    const victimAfter = robbed.state.players.find((p) => p.id === cpu.id)!;
+    expect(victimAfter.resources.gold).toBe(beforeThief - taken);
+    expect(thiefAfter.resources.gold).toBe(human.resources.gold + taken);
+    expect(robbed.events).toContainEqual(
+      expect.objectContaining({ type: 'resource-stolen', amount: taken }),
+    );
+  });
+
+  it('awards a shared objective to the first player to satisfy it', () => {
+    const objectivePool = [
+      {
+        id: 'test-quest' as ObjectiveId,
+        name: 'Test Quest',
+        description: 'Play a card.',
+        victoryPoints: 5,
+        condition: { type: 'cards-played', amount: 1 },
+      },
+    ] as const;
+    const state = createGame({
+      seed: 'objective-test',
+      humanFactionId: factions[0]!.id,
+      cpuFactionId: factions[1]!.id,
+      content: {
+        factions,
+        locations,
+        cards,
+        upgrades,
+        objectives: objectivePool,
+      },
+    }).state;
+    expect(state.objectives).toHaveLength(1);
+    expect(state.objectives[0]?.claimedBy).toBeNull();
+
+    const human = state.players[0]!;
+    const played = applyAction(state, {
+      type: 'play-card',
+      playerId: human.id,
+      cardId: cards[0]!.id,
+    });
+    expect(played.state.objectives[0]?.claimedBy).toBe(human.id);
+    expect(played.events).toContainEqual(
+      expect.objectContaining({
+        type: 'objective-claimed',
+        victoryPoints: 5,
+      }),
+    );
+    const claimer = played.state.players.find((p) => p.id === human.id)!;
+    expect(claimer.victoryPoints).toBeGreaterThanOrEqual(5);
+
+    // A second player meeting the same condition cannot claim it again.
+    const cpu = played.state.players[1]!;
+    const cpuTurn = {
+      ...played.state,
+      turn: { ...played.state.turn, activePlayerId: cpu.id },
+    };
+    const cpuPlayed = applyAction(cpuTurn, {
+      type: 'play-card',
+      playerId: cpu.id,
+      cardId: cpu.hand[0]!,
+    });
+    expect(cpuPlayed.state.objectives[0]?.claimedBy).toBe(human.id);
+    expect(
+      cpuPlayed.events.some((event) => event.type === 'objective-claimed'),
+    ).toBe(false);
   });
 
   it('plays typed effects and replenishes acquired market cards', () => {

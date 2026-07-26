@@ -27,7 +27,14 @@ Implemented two-player setup, four initial factions, five dice per player, twelv
 
 ## Milestone 4 — Content and polish
 
-**Status:** planned. Complete four factions, cards, upgrades, objectives, monsters, relics, tutorial, audio placeholders, save/resume, scoring presentation, and automated balance checks.
+**Status:** in progress. Four interaction systems are implemented end to end (engine, content, CPU evaluation, UI, and tests):
+
+- **Monster hunts** at Ruined Stronghold, with value-scaled overkill loot and critical strikes, and a guaranteed live hunt every round.
+- **Raid bosses** at Dragon Pass: the Elder Dragon carries a 20-health pool across rounds, and the finishing blow claims the whole bounty.
+- **Bumping**, letting a strictly higher die plus one influence drive a rival off a contested slot.
+- **Crown quests**: three seeded, first-come shared objectives with typed conditions.
+
+All four faction identities are also complete, each with a distinct grip on these systems, and the thirteen-step tutorial now teaches hunts, the raid, bumping, and quests. The market has grown to twenty cards, including empower, siege, and steal effects that reach into combat and rivalry rather than only granting income. State moved to schema v4 (shared objectives and raid damage). Remaining: more upgrades and relics; audio placeholders; and richer scoring presentation.
 
 ## Deferred
 

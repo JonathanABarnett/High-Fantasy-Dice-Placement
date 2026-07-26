@@ -1,5 +1,8 @@
 import {
+  applyAction,
+  dieValue,
   enumerateLegalActions,
+  raidDamageFor,
   SeededRandom,
 } from '@shattered-crown/game-engine';
 import type {
@@ -21,6 +24,27 @@ export interface EvaluatedAction {
   readonly score: number;
 }
 
+/**
+ * Victory points this action would immediately claim from shared objectives.
+ * Resolved by asking the engine to apply the action, so the CPU's view of a
+ * claim can never drift from the real rules.
+ */
+function objectiveClaimValue(state: GameState, action: GameAction): number {
+  if (state.objectives.every((objective) => objective.claimedBy !== null))
+    return 0;
+  try {
+    return applyAction(state, action).events.reduce(
+      (total, event) =>
+        event.type === 'objective-claimed' && event.playerId === action.playerId
+          ? total + event.victoryPoints
+          : total,
+      0,
+    );
+  } catch {
+    return 0;
+  }
+}
+
 export function evaluateCpuActions(
   state: GameState,
 ): readonly EvaluatedAction[] {
@@ -29,7 +53,7 @@ export function evaluateCpuActions(
   );
   if (!player || player.controller !== 'cpu') return [];
 
-  return enumerateLegalActions(state).map((action) => {
+  const scoreAction = (action: GameAction): EvaluatedAction => {
     if (action.type === 'pass') return { action, score: -100 };
     if (action.type === 'play-card') {
       const card = state.cards.find((item) => item.id === action.cardId);
@@ -40,6 +64,39 @@ export function evaluateCpuActions(
         if (effect.type === 'gain-victory-points')
           return total + effect.amount * 3;
         if (effect.type === 'draw-card') return total + effect.amount * 1.25;
+        if (effect.type === 'steal-resource') {
+          // Taking is worth roughly double gaining: it swings both scores.
+          const available = state.players.reduce(
+            (sum, rival) =>
+              rival.id === action.playerId
+                ? sum
+                : sum +
+                  Math.min(effect.amount, rival.resources[effect.resource]),
+            0,
+          );
+          return total + available * RESOURCE_VALUES[effect.resource] * 2;
+        }
+        if (effect.type === 'damage-raid') {
+          const raid = state.locations.find(
+            (item) =>
+              item.encounter?.health !== undefined &&
+              (state.raidDamage[item.id] ?? 0) < item.encounter.health,
+          );
+          // Worthless once the beast is dead, valuable while the race is on.
+          return total + (raid ? effect.amount * 0.5 : 0);
+        }
+        if (effect.type === 'boost-die') {
+          const target = player.dice.find(
+            (item) => item.id === action.targetDieId,
+          );
+          // A boost that reaches a critical strike is worth far more than one
+          // that just nudges a die up a point.
+          const reachesCrit =
+            target &&
+            dieValue(target) < 6 &&
+            dieValue(target) + effect.amount >= 6;
+          return total + effect.amount * 0.7 + (reachesCrit ? 2.5 : 0);
+        }
         return total + 1.1;
       }, 0);
       return { action, score: effectScore + 0.35 };
@@ -81,7 +138,8 @@ export function evaluateCpuActions(
           upgrade.replacement.symbols.length * 0.8,
       };
     }
-    if (action.type !== 'place-die') return { action, score: -50 };
+    if (action.type !== 'place-die' && action.type !== 'bump-die')
+      return { action, score: -50 };
     const location = state.locations.find(
       (item) => item.id === action.locationId,
     );
@@ -119,12 +177,63 @@ export function evaluateCpuActions(
       die.affinity === 'nature'
     )
       score += 0.5;
-    const face =
-      die.rolledFaceIndex === null
-        ? 0
-        : (die.faces[die.rolledFaceIndex]?.value ?? 0);
-    score -= face * 0.04;
+    const rolledFace =
+      die.rolledFaceIndex === null ? null : die.faces[die.rolledFaceIndex];
+    // Use the die's effective value so card boosts are priced correctly.
+    const faceValue = dieValue(die);
+    const critical =
+      faceValue >= 6 || (rolledFace?.symbols.includes('masterwork') ?? false);
+    // Combat rewards hitting hard, so a high die is an asset here rather than
+    // something to conserve. Value overkill loot, critical strikes, and above
+    // all the killing blow on a raid boss, which carries the whole bounty.
+    if (location.encounter) {
+      const encounter = location.encounter;
+      const slot = location.slots.find((item) => item.id === action.slotId);
+      if (encounter.health !== undefined) {
+        const already = state.raidDamage[location.id] ?? 0;
+        const remaining = encounter.health - already;
+        if (remaining > 0) {
+          const damage = raidDamageFor(player, die);
+          if (damage >= remaining) {
+            const bountyLoot = Object.entries(encounter.bounty?.loot ?? {});
+            score +=
+              (encounter.bounty?.victoryPoints ?? 0) * 3 +
+              bountyLoot.reduce(
+                (total, [resource, amount]) =>
+                  total +
+                  (amount ?? 0) * RESOURCE_VALUES[resource as ResourceType],
+                0,
+              );
+          } else {
+            // Chip damage still matters: it races the rival to the finisher.
+            score += damage * 0.45;
+          }
+        }
+      } else {
+        const threat = slot?.requirement.minimumValue ?? 1;
+        score +=
+          Math.max(0, faceValue - threat) * RESOURCE_VALUES[encounter.loot];
+        if (critical) score += encounter.criticalBonus * 3;
+      }
+    }
+    // Bumping denies a rival a held slot, but it costs influence, spends a
+    // strong die, and hands the victim their die back. Price it as a deliberate
+    // swing rather than a default play, so it stays a memorable moment.
+    if (action.type === 'bump-die') {
+      score -= 1.6 + RESOURCE_VALUES.influence;
+    }
+    score -= faceValue * 0.04;
     return { action, score };
+  };
+
+  return enumerateLegalActions(state).map((action) => {
+    const evaluated = scoreAction(action);
+    // Claiming a shared objective is worth racing for on top of the action's
+    // own merits, so a quest can tip which otherwise-similar play wins.
+    const claim = objectiveClaimValue(state, action);
+    return claim > 0
+      ? { action, score: evaluated.score + claim * 3 }
+      : evaluated;
   });
 }
 
