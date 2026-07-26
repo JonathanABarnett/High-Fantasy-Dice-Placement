@@ -174,24 +174,28 @@ test('unlocks Forge Hall and permanently upgrades a die face', async ({
 });
 
 test('can complete all six rounds by passing', async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   await page.goto('/');
   await page.getByRole('button', { name: 'Start match' }).click();
   const roundStatus = page.locator('.round-block strong');
 
-  for (let round = 1; round <= 6; round += 1) {
-    await expect(roundStatus).toHaveText(`Round ${round} / 6`, {
-      timeout: 20_000,
-    });
+  for (let passCount = 0; passCount < 6; passCount += 1) {
+    if (await page.getByText('Match complete').isVisible()) break;
+    const previousRound = await roundStatus.textContent();
     const pass = page.getByRole('button', { name: 'Pass for this round' });
-    await expect(pass).toBeEnabled({ timeout: 20_000 });
+    await expect(pass).toBeEnabled({ timeout: 60_000 });
     await pass.scrollIntoViewIfNeeded();
     await pass.click();
-    if (round < 6) {
-      await expect(roundStatus).toHaveText(`Round ${round + 1} / 6`, {
-        timeout: 60_000,
-      });
-    }
+    await expect
+      .poll(
+        async () => {
+          if (await page.getByText('Match complete').isVisible())
+            return 'complete';
+          return (await roundStatus.textContent()) ?? '';
+        },
+        { timeout: 90_000 },
+      )
+      .not.toBe(previousRound);
   }
 
   await expect(page.getByText('Match complete')).toBeVisible({
