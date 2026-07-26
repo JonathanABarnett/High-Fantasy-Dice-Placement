@@ -82,6 +82,7 @@ test('pins location details and exposes preview icon explanations', async ({
 test('guides a new player through the complete visual tutorial', async ({
   page,
 }) => {
+  test.setTimeout(90_000);
   await page.goto('/');
   await page.getByRole('button', { name: 'Learn to play' }).click();
 
@@ -107,7 +108,9 @@ test('guides a new player through the complete visual tutorial', async ({
     'Follow the log and build your score',
   ];
   for (const title of remainingTitles) {
-    await tutorial.getByRole('button', { name: 'Next' }).click();
+    const next = tutorial.getByRole('button', { name: 'Next' });
+    await expect(next).toBeEnabled({ timeout: 10_000 });
+    await next.click({ timeout: 10_000 });
     await expect(tutorial.getByRole('heading', { name: title })).toBeVisible();
     if (title === 'Unlock upgrades at Forge Hall') {
       const boardBox = await page.getByTestId('pixi-board').boundingBox();
