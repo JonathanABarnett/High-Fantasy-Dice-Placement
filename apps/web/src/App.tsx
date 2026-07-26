@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { type CSSProperties, useEffect, useMemo, useState } from 'react';
 
 import { chooseCpuAction } from '@shattered-crown/game-ai';
 import {
@@ -19,6 +19,7 @@ import {
   validateAction,
 } from '@shattered-crown/game-engine';
 import type {
+  CardCategory,
   DieId,
   FactionId,
   GameAction,
@@ -40,6 +41,9 @@ import {
 import { AFFINITY_INFO } from './components/rules-info';
 import { useInterfaceStore } from './stores/interface-store';
 import { TutorialOverlay } from './tutorial/TutorialOverlay';
+import allyCardArt from '../../../assets/generated/cards/category-ally-v1.webp';
+import relicCardArt from '../../../assets/generated/cards/category-relic-v1.webp';
+import tacticCardArt from '../../../assets/generated/cards/category-tactic-v1.webp';
 import arcanumPortrait from '../../../assets/generated/factions/arcanum-conclave-v1.png';
 import emberPortrait from '../../../assets/generated/factions/ember-dominion-v1.png';
 import stoneboundPortrait from '../../../assets/generated/factions/stonebound-league-v1.png';
@@ -53,6 +57,17 @@ const FACTION_PORTRAITS: Readonly<Record<string, string>> = {
   'verdant-covenant': verdantPortrait,
   'stonebound-league': stoneboundPortrait,
 };
+const CARD_CATEGORY_ART: Readonly<Record<CardCategory, string>> = {
+  tactic: tacticCardArt,
+  ally: allyCardArt,
+  relic: relicCardArt,
+};
+
+function cardArtStyle(category: CardCategory): CSSProperties {
+  return {
+    '--card-art': `url(${CARD_CATEGORY_ART[category]})`,
+  } as CSSProperties;
+}
 
 function describeEvent(event: GameEvent, state: GameState): string {
   if (event.type === 'round-started') {
@@ -789,6 +804,7 @@ export function App() {
                       <article
                         className="game-card hand-card"
                         key={`${cardId}-${index}`}
+                        style={cardArtStyle(card.category)}
                       >
                         <strong>{card.name}</strong>
                         <CategoryToken category={card.category} />
@@ -834,6 +850,7 @@ export function App() {
                       <article
                         className="game-card market-card"
                         key={`${cardId}-${index}`}
+                        style={cardArtStyle(card.category)}
                       >
                         <strong>{card.name}</strong>
                         <CategoryToken category={card.category} />
