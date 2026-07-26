@@ -1,4 +1,10 @@
-import { type CSSProperties, useEffect, useMemo, useState } from 'react';
+import {
+  type CSSProperties,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
 import { chooseCpuAction } from '@shattered-crown/game-ai';
 import {
@@ -199,6 +205,66 @@ function RequirementTokens({
   );
 }
 
+type CollapsiblePanelId =
+  'pressure' | 'quests' | 'cards' | 'forge' | 'preview' | 'log';
+
+type CollapsedPanels = Readonly<Record<CollapsiblePanelId, boolean>>;
+
+function CollapsiblePanel({
+  ariaLabel,
+  ariaLive,
+  children,
+  className,
+  contentId,
+  dataTutorial,
+  open,
+  summary,
+  title,
+  titleLevel = 3,
+  onToggle,
+}: {
+  readonly ariaLabel?: string;
+  readonly ariaLive?: 'off' | 'polite' | 'assertive';
+  readonly children: ReactNode;
+  readonly className: string;
+  readonly contentId: string;
+  readonly dataTutorial?: string;
+  readonly open: boolean;
+  readonly summary?: ReactNode;
+  readonly title: ReactNode;
+  readonly titleLevel?: 2 | 3;
+  readonly onToggle: () => void;
+}) {
+  const Heading = titleLevel === 2 ? 'h2' : 'h3';
+  return (
+    <section
+      aria-label={ariaLabel}
+      aria-live={ariaLive}
+      className={`${className} collapsible-panel ${open ? 'is-open' : 'is-collapsed'}`}
+      data-tutorial={dataTutorial}
+    >
+      <div className="panel-heading collapsible-heading">
+        <Heading>{title}</Heading>
+        <span className="panel-summary">{summary}</span>
+        <button
+          aria-controls={contentId}
+          aria-expanded={open}
+          className="panel-toggle"
+          onClick={onToggle}
+          type="button"
+        >
+          {open ? 'Collapse' : 'Show'}
+        </button>
+      </div>
+      {open && (
+        <div className="collapsible-content" id={contentId}>
+          {children}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function App() {
   const [selectedFaction, setSelectedFaction] = useState<FactionId>(
     factions[0].id,
@@ -218,6 +284,14 @@ export function App() {
   const [tutorialCompleted, setTutorialCompleted] = useState(
     () => localStorage.getItem(TUTORIAL_KEY) === 'true',
   );
+  const [collapsedPanels, setCollapsedPanels] = useState<CollapsedPanels>({
+    pressure: true,
+    quests: true,
+    cards: false,
+    forge: false,
+    preview: false,
+    log: true,
+  });
   const reducedMotion = useInterfaceStore((state) => state.reducedMotion);
   const toggleReducedMotion = useInterfaceStore(
     (state) => state.toggleReducedMotion,
@@ -236,6 +310,11 @@ export function App() {
   );
   const selectedDie =
     human?.dice.find((die) => die.id === selectedDieId) ?? null;
+  const togglePanel = (panel: CollapsiblePanelId) =>
+    setCollapsedPanels((current) => ({
+      ...current,
+      [panel]: !current[panel],
+    }));
   const pressure = useMemo(() => {
     if (!game || !human) return null;
     const openLocations = game.locations.filter(
@@ -691,14 +770,20 @@ export function App() {
                 })}
               </div>
               {pressure && (
-                <section className="pressure-panel" aria-label="Round pressure">
-                  <div className="panel-heading">
-                    <h3>Round pressure</h3>
-                    <span>
+                <CollapsiblePanel
+                  ariaLabel="Round pressure"
+                  className="pressure-panel"
+                  contentId="round-pressure-panel"
+                  open={!collapsedPanels.pressure}
+                  summary={
+                    <>
                       {pressure.remainingSlots}/{pressure.totalOpenSlots} slots
                       left
-                    </span>
-                  </div>
+                    </>
+                  }
+                  title="Round pressure"
+                  onToggle={() => togglePanel('pressure')}
+                >
                   <div className="pressure-grid">
                     <span>
                       <strong>{pressure.openLocations}</strong>
@@ -722,25 +807,28 @@ export function App() {
                       ? `${pressure.lowDiceWithRoutes}/${pressure.lowDice} low dice still have a legal route.`
                       : 'No low dice rolled right now.'}
                   </p>
-                </section>
+                </CollapsiblePanel>
               )}
               {game.objectives.length > 0 && (
-                <section
+                <CollapsiblePanel
                   aria-label="Crown quests"
                   className="quest-panel"
-                  data-tutorial="quests"
-                >
-                  <div className="panel-heading">
-                    <h3>Crown Quests</h3>
-                    <span>
+                  contentId="crown-quests-panel"
+                  dataTutorial="quests"
+                  open={!collapsedPanels.quests}
+                  summary={
+                    <>
                       {
                         game.objectives.filter(
                           (item) => item.claimedBy === null,
                         ).length
                       }{' '}
                       unclaimed
-                    </span>
-                  </div>
+                    </>
+                  }
+                  title="Crown Quests"
+                  onToggle={() => togglePanel('quests')}
+                >
                   <ul className="quest-list">
                     {game.objectives.map((objective) => {
                       const claimant = game.players.find(
@@ -776,12 +864,17 @@ export function App() {
                       );
                     })}
                   </ul>
-                </section>
+                </CollapsiblePanel>
               )}
-              <section
+              <CollapsiblePanel
                 className="card-panel"
                 aria-label="Card hand and market"
-                data-tutorial="cards"
+                contentId="cards-market-panel"
+                dataTutorial="cards"
+                open={!collapsedPanels.cards}
+                summary={`${human?.hand.length ?? 0} hand · ${game.cardDeck.length} deck`}
+                title="Cards and market"
+                onToggle={() => togglePanel('cards')}
               >
                 <div className="panel-heading">
                   <h3>Your hand</h3>
@@ -872,7 +965,7 @@ export function App() {
                     );
                   })}
                 </div>
-              </section>
+              </CollapsiblePanel>
 
               {human &&
                 game.locations.some(
@@ -882,11 +975,15 @@ export function App() {
                       (slot) => slot.occupantPlayerId === human.id,
                     ),
                 ) && (
-                  <section className="forge-panel" aria-label="Forge upgrades">
-                    <div className="panel-heading">
-                      <h3>Forge Hall</h3>
-                      <span>Permanent upgrades</span>
-                    </div>
+                  <CollapsiblePanel
+                    ariaLabel="Forge upgrades"
+                    className="forge-panel"
+                    contentId="forge-upgrades-panel"
+                    open={!collapsedPanels.forge}
+                    summary="Permanent upgrades"
+                    title="Forge Hall"
+                    onToggle={() => togglePanel('forge')}
+                  >
                     <div className="forge-controls">
                       <label>
                         Die
@@ -974,14 +1071,22 @@ export function App() {
                         );
                       })}
                     </div>
-                  </section>
+                  </CollapsiblePanel>
                 )}
-              <section
+              <CollapsiblePanel
                 className="location-preview"
-                aria-live="polite"
-                data-tutorial="preview"
+                ariaLive="polite"
+                contentId="location-preview-panel"
+                dataTutorial="preview"
+                open={!collapsedPanels.preview}
+                summary={
+                  inspectedLocation
+                    ? inspectedLocation.name
+                    : 'Hover or click a location'
+                }
+                title="Location preview"
+                onToggle={() => togglePanel('preview')}
               >
-                <p className="eyebrow">Location preview</p>
                 {inspectedLocation ? (
                   <>
                     <h3>{inspectedLocation.name}</h3>
@@ -1234,7 +1339,7 @@ export function App() {
                     restrictions.
                   </p>
                 )}
-              </section>
+              </CollapsiblePanel>
               {selectedDieId && human && (
                 <details className="accessible-actions">
                   <summary>Keyboard placement options</summary>
@@ -1284,14 +1389,22 @@ export function App() {
                 </p>
               )}
             </section>
-            <section className="log-panel" data-tutorial="log">
-              <h2>Match log</h2>
+            <CollapsiblePanel
+              className="log-panel"
+              contentId="match-log-panel"
+              dataTutorial="log"
+              open={!collapsedPanels.log}
+              summary={`${log.length} entries`}
+              title="Match log"
+              titleLevel={2}
+              onToggle={() => togglePanel('log')}
+            >
               <ol>
                 {log.map((entry, index) => (
                   <li key={`${entry}-${index}`}>{entry}</li>
                 ))}
               </ol>
-            </section>
+            </CollapsiblePanel>
           </aside>
         </div>
       )}

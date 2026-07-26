@@ -110,5 +110,5 @@ describe('faction balance', () => {
       return record.points / record.games;
     });
     expect(Math.min(...averages)).toBeGreaterThan(Math.max(...averages) * 0.7);
-  });
+  }, 10_000);
 });

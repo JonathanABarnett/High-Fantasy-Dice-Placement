@@ -1,6 +1,13 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 test.describe.configure({ mode: 'serial' });
+
+async function openMatchLog(page: Page) {
+  const log = page.locator('.log-panel');
+  const show = log.getByRole('button', { name: 'Show' });
+  if (await show.isVisible()) await show.click();
+  return log;
+}
 
 test('starts a deterministic human-versus-CPU match', async ({ page }) => {
   await page.goto('/');
@@ -21,6 +28,10 @@ test('starts a deterministic human-versus-CPU match', async ({ page }) => {
   await expect(
     page.getByRole('region', { name: 'Round pressure' }),
   ).toContainText('8/8 slots left');
+  await expect(
+    page.getByRole('button', { name: 'Show' }).first(),
+  ).toBeVisible();
+  await expect(page.locator('.log-panel')).toContainText('entries');
 });
 
 test('explains resources and clearly marks die placement routes', async ({
@@ -138,7 +149,8 @@ test('supports keyboard-accessible placement controls', async ({ page }) => {
     .first();
   await expect(legalLocation).toBeEnabled();
   await legalLocation.click();
-  await expect(page.getByText(/Player placed a die at/).first()).toBeVisible();
+  const log = await openMatchLog(page);
+  await expect(log.getByText(/Player placed a die at/).first()).toBeVisible();
 });
 
 test('plays a faction card through the typed effect system', async ({
@@ -149,8 +161,9 @@ test('plays a faction card through the typed effect system', async ({
   await expect(page.getByRole('heading', { name: 'Your hand' })).toBeVisible();
   await expect(page.getByText('Revelation of Stars')).toBeVisible();
   await page.getByRole('button', { name: 'Play card' }).click();
+  const log = await openMatchLog(page);
   await expect(
-    page.getByText('Player played Revelation of Stars.'),
+    log.getByText('Player played Revelation of Stars.'),
   ).toBeVisible();
 });
 
@@ -183,7 +196,8 @@ test('unlocks Forge Hall and permanently upgrades a die face', async ({
   const forgeButton = forgePanel.getByRole('button', { name: 'Forge' }).first();
   await expect(forgeButton).toBeEnabled({ timeout: 20_000 });
   await forgeButton.click();
-  await expect(page.getByText(/Player forged Tempered Pair/)).toBeVisible();
+  const log = await openMatchLog(page);
+  await expect(log.getByText(/Player forged Tempered Pair/)).toBeVisible();
 });
 
 test('can complete all six rounds by passing', async ({ page }) => {
