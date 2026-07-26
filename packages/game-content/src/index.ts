@@ -294,6 +294,102 @@ export const cards = [
     target: 'none',
     marketCopies: 2,
   },
+  {
+    id: cardId('trophy-cabinet'),
+    name: 'Trophy Cabinet',
+    category: 'relic',
+    cost: { knowledge: 1, influence: 1 },
+    effects: [
+      {
+        type: 'gain-victory-points-per-monster',
+        amountPerMonster: 2,
+        maxAmount: 8,
+      },
+    ],
+    rulesText:
+      'Gain 2 victory points for each monster you have slain, up to 8.',
+    target: 'none',
+    marketCopies: 2,
+  },
+  {
+    id: cardId('forge-charter'),
+    name: 'Forge Charter',
+    category: 'ally',
+    cost: { knowledge: 1, materials: 1 },
+    effects: [
+      {
+        type: 'gain-victory-points-per-upgrade',
+        amountPerUpgrade: 1,
+        maxAmount: 5,
+      },
+      { type: 'gain-resource', resource: 'materials', amount: 1 },
+    ],
+    rulesText:
+      'Gain 1 victory point per forged die face, up to 5, then gain 1 material.',
+    target: 'none',
+    marketCopies: 2,
+  },
+  {
+    id: cardId('veteran-captain'),
+    name: 'Veteran Captain',
+    category: 'ally',
+    cost: { gold: 1, influence: 1 },
+    effects: [
+      {
+        type: 'gain-resource-per-tag-placement',
+        tag: 'combat',
+        resource: 'gold',
+        amountPerPlacement: 1,
+        maxAmount: 4,
+      },
+      { type: 'draw-card', amount: 1 },
+    ],
+    rulesText:
+      'Gain 1 gold per combat placement you have made, up to 4, then draw a card.',
+    target: 'none',
+    marketCopies: 2,
+  },
+  {
+    id: cardId('siege-banner'),
+    name: 'Siege Banner',
+    category: 'tactic',
+    cost: { influence: 1 },
+    effects: [
+      { type: 'damage-raid', amount: 3 },
+      { type: 'boost-die', amount: 1 },
+    ],
+    rulesText:
+      'Deal 3 damage to the raid boss, then a ready die gains +1 value this round.',
+    target: 'ready-die',
+    marketCopies: 2,
+  },
+  {
+    id: cardId('blackmail-ledger'),
+    name: 'Blackmail Ledger',
+    category: 'relic',
+    cost: { knowledge: 1, influence: 1 },
+    effects: [
+      { type: 'steal-resource', resource: 'gold', amount: 1 },
+      { type: 'steal-resource', resource: 'influence', amount: 1 },
+    ],
+    rulesText: 'Steal 1 gold and 1 influence from every rival.',
+    target: 'none',
+    marketCopies: 2,
+  },
+  {
+    id: cardId('battle-prayer'),
+    name: 'Battle Prayer',
+    category: 'tactic',
+    cost: { mana: 1 },
+    effects: [
+      { type: 'boost-die', amount: 1 },
+      { type: 'gain-victory-points', amount: 1 },
+    ],
+    rulesText:
+      'A ready die gains +1 value this round, then gain 1 victory point.',
+    target: 'ready-die',
+    marketCopies: 2,
+  },
 ] as const satisfies readonly Card[];
 
 export const upgrades = [
@@ -345,6 +441,54 @@ export const upgrades = [
     replacement: { value: 6, symbols: ['masterwork'] },
     scoreValue: 3,
   },
+  {
+    id: upgradeId('iron-three'),
+    name: 'Iron Three',
+    description: 'A low-cost value-3 face bearing a material sigil.',
+    cost: { materials: 2 },
+    replacement: { value: 3, symbols: ['materials'] },
+    scoreValue: 1,
+  },
+  {
+    id: upgradeId('sapphire-five'),
+    name: 'Sapphire Five',
+    description: 'A value-5 face bearing a mana sigil.',
+    cost: { materials: 3, mana: 1 },
+    replacement: { value: 5, symbols: ['mana'] },
+    scoreValue: 2,
+  },
+  {
+    id: upgradeId('scholar-six'),
+    name: 'Scholar Six',
+    description: 'A value-6 face bearing a knowledge sigil.',
+    cost: { materials: 3, knowledge: 2 },
+    replacement: { value: 6, symbols: ['knowledge'] },
+    scoreValue: 3,
+  },
+  {
+    id: upgradeId('battle-scarred-five'),
+    name: 'Battle-Scarred Five',
+    description: 'A value-5 face that carries both gold and masterwork glory.',
+    cost: { materials: 3, gold: 1, influence: 1 },
+    replacement: { value: 5, symbols: ['gold', 'masterwork'] },
+    scoreValue: 3,
+  },
+  {
+    id: upgradeId('living-two'),
+    name: 'Living Two',
+    description: 'A flexible value-2 face with mana and material sigils.',
+    cost: { materials: 2, mana: 1 },
+    replacement: { value: 2, symbols: ['mana', 'materials'] },
+    scoreValue: 2,
+  },
+  {
+    id: upgradeId('courtly-six'),
+    name: 'Courtly Six',
+    description: 'A value-6 face bearing an influence sigil.',
+    cost: { materials: 3, influence: 2 },
+    replacement: { value: 6, symbols: ['influence'] },
+    scoreValue: 3,
+  },
 ] as const satisfies readonly UpgradeDefinition[];
 
 export const objectives = [
@@ -389,6 +533,20 @@ export const objectives = [
     description: 'First to channel 8 mana.',
     victoryPoints: 3,
     condition: { type: 'total-resource', resource: 'mana', amount: 8 },
+  },
+  {
+    id: objectiveId('banner-lord'),
+    name: 'Banner Lord',
+    description: 'First to play 2 allies.',
+    victoryPoints: 3,
+    condition: { type: 'category-cards-played', category: 'ally', amount: 2 },
+  },
+  {
+    id: objectiveId('relic-keeper'),
+    name: 'Relic Keeper',
+    description: 'First to play 2 relics.',
+    victoryPoints: 3,
+    condition: { type: 'category-cards-played', category: 'relic', amount: 2 },
   },
 ] as const satisfies readonly Objective[];
 

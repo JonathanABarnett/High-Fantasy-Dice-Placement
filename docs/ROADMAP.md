@@ -34,7 +34,7 @@ Implemented two-player setup, four initial factions, five dice per player, twelv
 - **Bumping**, letting a strictly higher die plus one influence drive a rival off a contested slot.
 - **Crown quests**: three seeded, first-come shared objectives with typed conditions.
 
-All four faction identities are also complete, each with a distinct grip on these systems, and the thirteen-step tutorial now teaches hunts, the raid, bumping, and quests. The market has grown to twenty cards, including empower, siege, and steal effects that reach into combat and rivalry rather than only granting income. State moved to schema v4 (shared objectives and raid damage). Remaining: more upgrades and relics; audio placeholders; and richer scoring presentation.
+All four faction identities are also complete, each with a distinct grip on these systems, and the thirteen-step tutorial now teaches hunts, the raid, bumping, and quests. The market has grown to twenty-six cards, including empower, siege, steal, trophy, forged-face, and tag-payoff effects that reach into combat, rivalry, and long-term engines rather than only granting income. The Forge shop has grown to twelve permanent faces, including dual-symbol and masterwork lines. State moved to schema v4 (shared objectives and raid damage). Remaining: audio placeholders, deeper AI personality, end-game scoring presentation, and more late-game content.
 
 ## Deferred
 

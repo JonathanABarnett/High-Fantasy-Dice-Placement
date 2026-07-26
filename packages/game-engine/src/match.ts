@@ -19,7 +19,6 @@ import type {
   PlayerId,
   PlayerState,
   ResourcePool,
-  ResourceType,
   ScoreBreakdown,
   UpgradeDefinition,
 } from '@shattered-crown/shared-types';
@@ -865,21 +864,34 @@ function findDie(state: GameState, dieId: DieId | null): Die | null {
   return null;
 }
 
+function forgedFaceCount(player: PlayerState): number {
+  return player.dice.reduce((total, die) => total + die.enhancements.length, 0);
+}
+
 function meetsObjective(
   player: PlayerState,
   condition: ObjectiveCondition,
+  cards: readonly Card[],
 ): boolean {
   if (condition.type === 'monsters-slain')
     return player.monstersSlain >= condition.amount;
   if (condition.type === 'total-resource')
     return player.resources[condition.resource] >= condition.amount;
   if (condition.type === 'upgrades-forged')
-    return (
-      player.dice.reduce((total, die) => total + die.enhancements.length, 0) >=
-      condition.amount
-    );
+    return forgedFaceCount(player) >= condition.amount;
   if (condition.type === 'cards-played')
     return player.playedCards.length >= condition.amount;
+  if (condition.type === 'category-cards-played') {
+    const matchingCards = new Set(
+      cards
+        .filter((card) => card.category === condition.category)
+        .map((card) => card.id),
+    );
+    return (
+      player.playedCards.filter((cardId) => matchingCards.has(cardId)).length >=
+      condition.amount
+    );
+  }
   return (player.placementCounts[condition.tag] ?? 0) >= condition.amount;
 }
 
@@ -892,6 +904,7 @@ function resolveObjectives(
   objectives: readonly ClaimableObjective[],
   players: readonly PlayerState[],
   playerId: PlayerId,
+  cards: readonly Card[],
   startingSequence: number,
 ): {
   readonly objectives: readonly ClaimableObjective[];
@@ -907,7 +920,7 @@ function resolveObjectives(
   let victoryPoints = 0;
   const updatedObjectives = objectives.map((objective) => {
     if (objective.claimedBy !== null) return objective;
-    if (!meetsObjective(player, objective.condition)) return objective;
+    if (!meetsObjective(player, objective.condition, cards)) return objective;
     victoryPoints += objective.victoryPoints;
     sequence += 1;
     events.push({
@@ -933,6 +946,10 @@ function resolveObjectives(
     events,
     sequence,
   };
+}
+
+function cappedAmount(amount: number, maxAmount?: number): number {
+  return Math.max(0, Math.min(maxAmount ?? amount, amount));
 }
 
 function scoreMatch(state: GameState): MatchResult {
@@ -1138,8 +1155,7 @@ export function applyAction(
     ) as PlayerState;
     const handIndex = actingPlayer.hand.indexOf(card.id);
     /** Resources taken from each rival this card, applied after its effects. */
-    const stolen = new Map<PlayerId, number>();
-    let stolenResource: ResourceType | null = null;
+    const stolen = new Map<PlayerId, Partial<ResourcePool>>();
     let updatedPlayer: PlayerState = {
       ...actingPlayer,
       resources: adjustResources(actingPlayer.resources, card.cost, -1),
@@ -1185,6 +1201,66 @@ export function applyAction(
           playerId: action.playerId,
           amount: effect.amount,
         });
+      } else if (effect.type === 'gain-victory-points-per-monster') {
+        const amount = cappedAmount(
+          updatedPlayer.monstersSlain * effect.amountPerMonster,
+          effect.maxAmount,
+        );
+        if (amount > 0) {
+          updatedPlayer = {
+            ...updatedPlayer,
+            victoryPoints: updatedPlayer.victoryPoints + amount,
+          };
+          sequence += 1;
+          events.push({
+            type: 'victory-points-gained',
+            sequence,
+            playerId: action.playerId,
+            amount,
+          });
+        }
+      } else if (effect.type === 'gain-victory-points-per-upgrade') {
+        const amount = cappedAmount(
+          forgedFaceCount(updatedPlayer) * effect.amountPerUpgrade,
+          effect.maxAmount,
+        );
+        if (amount > 0) {
+          updatedPlayer = {
+            ...updatedPlayer,
+            victoryPoints: updatedPlayer.victoryPoints + amount,
+          };
+          sequence += 1;
+          events.push({
+            type: 'victory-points-gained',
+            sequence,
+            playerId: action.playerId,
+            amount,
+          });
+        }
+      } else if (effect.type === 'gain-resource-per-tag-placement') {
+        const amount = cappedAmount(
+          (updatedPlayer.placementCounts[effect.tag] ?? 0) *
+            effect.amountPerPlacement,
+          effect.maxAmount,
+        );
+        if (amount > 0) {
+          updatedPlayer = {
+            ...updatedPlayer,
+            resources: adjustResources(
+              updatedPlayer.resources,
+              { [effect.resource]: amount },
+              1,
+            ),
+          };
+          sequence += 1;
+          events.push({
+            type: 'resource-gained',
+            sequence,
+            playerId: action.playerId,
+            resource: effect.resource,
+            amount,
+          });
+        }
       } else if (effect.type === 'draw-card') {
         const drawn = cardDeck.slice(0, effect.amount);
         cardDeck = cardDeck.slice(drawn.length);
@@ -1282,7 +1358,11 @@ export function applyAction(
             rival.resources[effect.resource],
           );
           if (taken <= 0) continue;
-          stolen.set(rival.id, (stolen.get(rival.id) ?? 0) + taken);
+          const rivalLoss = stolen.get(rival.id) ?? {};
+          stolen.set(rival.id, {
+            ...rivalLoss,
+            [effect.resource]: (rivalLoss[effect.resource] ?? 0) + taken,
+          });
           updatedPlayer = {
             ...updatedPlayer,
             resources: adjustResources(
@@ -1301,20 +1381,15 @@ export function applyAction(
             amount: taken,
           });
         }
-        stolenResource = effect.resource;
       }
     }
     players = players.map((player) => {
       if (player.id === action.playerId) return updatedPlayer;
       const loss = stolen.get(player.id);
-      return loss && stolenResource
+      return loss
         ? {
             ...player,
-            resources: adjustResources(
-              player.resources,
-              { [stolenResource]: loss },
-              -1,
-            ),
+            resources: adjustResources(player.resources, loss, -1),
           }
         : player;
     });
@@ -1604,6 +1679,7 @@ export function applyAction(
     objectives,
     players,
     action.playerId,
+    state.cards,
     sequence,
   );
   objectives = objectiveOutcome.objectives;

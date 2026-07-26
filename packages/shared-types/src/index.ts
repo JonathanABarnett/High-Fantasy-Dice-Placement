@@ -110,6 +110,11 @@ export type ObjectiveCondition =
   | { readonly type: 'upgrades-forged'; readonly amount: number }
   | { readonly type: 'cards-played'; readonly amount: number }
   | {
+      readonly type: 'category-cards-played';
+      readonly category: CardCategory;
+      readonly amount: number;
+    }
+  | {
       readonly type: 'tag-placements';
       readonly tag: string;
       readonly amount: number;
@@ -146,6 +151,26 @@ export type GameEffect =
       readonly type: 'steal-resource';
       readonly resource: ResourceType;
       readonly amount: number;
+    }
+  /** Cash in the monsters this player has personally slain. */
+  | {
+      readonly type: 'gain-victory-points-per-monster';
+      readonly amountPerMonster: number;
+      readonly maxAmount?: number;
+    }
+  /** Cash in permanent forged faces across all of this player's dice. */
+  | {
+      readonly type: 'gain-victory-points-per-upgrade';
+      readonly amountPerUpgrade: number;
+      readonly maxAmount?: number;
+    }
+  /** Reward a player for prior placements at a tagged kind of location. */
+  | {
+      readonly type: 'gain-resource-per-tag-placement';
+      readonly tag: string;
+      readonly resource: ResourceType;
+      readonly amountPerPlacement: number;
+      readonly maxAmount?: number;
     };
 
 export interface Card {

@@ -1,6 +1,6 @@
 # Realms of the Shattered Crown
 
-A browser-first high-fantasy dice-placement strategy game. The repository is currently at **Milestone 3** with a **Milestone 4** combat layer underway: a complete deterministic match with executable cards, a seeded market, permanent die upgrades, an interactive PixiJS fantasy board, and a replayable visual tutorial.
+A browser-first high-fantasy dice-placement strategy game. The repository is currently at **Milestone 4**: a complete deterministic match with executable cards, a seeded market, permanent die upgrades, an interactive PixiJS fantasy board, a replayable visual tutorial, and a growing combat/rivalry layer.
 
 Combat and competition turn raw dice values into drama:
 
@@ -9,7 +9,7 @@ Combat and competition turn raw dice values into drama:
 - **Bumping** — a strictly higher die plus one influence drives a rival off a contested slot. Their die returns to them ready, so it costs tempo rather than destroying it.
 - **Crown quests** — three shared, first-come objectives drawn per match. The moment someone meets one, it is theirs for good.
 
-- **Cards that reach the board** — empower a die mid-round to clear a gate or reach a critical strike, batter the dragon with siege weapons (though a die must still land the killing blow), or simply steal from your rivals.
+- **Cards that reach the board** — empower a die mid-round to clear a gate or reach a critical strike, batter the dragon with siege weapons (though a die must still land the killing blow), steal from your rivals, or cash in prior monster kills, combat placements, and forged faces.
 
 All four factions are playable and pull on these systems differently: Ember are the fastest dragonslayers, Stonebound are hardest to shift off a slot, Arcanum displace rivals cheaply with magic, and Verdant field a sixth die and profit from being bumped.
 
@@ -31,4 +31,4 @@ pnpm check
 pnpm test:e2e
 ```
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for package responsibilities and [`docs/ROADMAP.md`](docs/ROADMAP.md) for scope. [`docs/HANDOFF.md`](docs/HANDOFF.md) records the reasoning and invariants behind the Milestone 4 interaction systems.
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for package responsibilities, [`docs/RULES.md`](docs/RULES.md) for implemented rules, and [`docs/ROADMAP.md`](docs/ROADMAP.md) for scope.

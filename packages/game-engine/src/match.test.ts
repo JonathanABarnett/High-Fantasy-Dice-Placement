@@ -1020,6 +1020,118 @@ describe('headless match', () => {
     );
   });
 
+  it('resolves payoff cards from prior hunts, forged faces, and tag placements', () => {
+    const trophy: Card = {
+      id: 'trophy-card' as CardId,
+      name: 'Test Trophy Cabinet',
+      category: 'relic',
+      cost: {},
+      effects: [
+        {
+          type: 'gain-victory-points-per-monster',
+          amountPerMonster: 2,
+          maxAmount: 8,
+        },
+      ],
+      rulesText: 'Cash in kills.',
+      target: 'none',
+      marketCopies: 0,
+    };
+    const charter: Card = {
+      id: 'charter-card' as CardId,
+      name: 'Test Forge Charter',
+      category: 'ally',
+      cost: {},
+      effects: [
+        {
+          type: 'gain-victory-points-per-upgrade',
+          amountPerUpgrade: 1,
+        },
+      ],
+      rulesText: 'Cash in upgrades.',
+      target: 'none',
+      marketCopies: 0,
+    };
+    const captain: Card = {
+      id: 'captain-card' as CardId,
+      name: 'Test Veteran Captain',
+      category: 'ally',
+      cost: {},
+      effects: [
+        {
+          type: 'gain-resource-per-tag-placement',
+          tag: 'combat',
+          resource: 'gold',
+          amountPerPlacement: 1,
+          maxAmount: 4,
+        },
+      ],
+      rulesText: 'Cash in combat.',
+      target: 'none',
+      marketCopies: 0,
+    };
+    const state = createGame({
+      seed: 'payoff-cards',
+      humanFactionId: factions[0]!.id,
+      cpuFactionId: factions[1]!.id,
+      content: {
+        factions,
+        locations,
+        cards: [...cards, trophy, charter, captain],
+        upgrades,
+      },
+    }).state;
+    const human = state.players[0]!;
+    const primed = {
+      ...state,
+      players: state.players.map((player) =>
+        player.id === human.id
+          ? {
+              ...player,
+              hand: [trophy.id, charter.id, captain.id],
+              monstersSlain: 3,
+              placementCounts: { combat: 5 },
+              dice: player.dice.map((die, index) =>
+                index === 0
+                  ? {
+                      ...die,
+                      enhancements: ['alpha' as UpgradeId, 'beta' as UpgradeId],
+                    }
+                  : die,
+              ),
+            }
+          : player,
+      ),
+    };
+
+    const scoredKills = applyAction(primed, {
+      type: 'play-card',
+      playerId: human.id,
+      cardId: trophy.id,
+    });
+    expect(scoredKills.state.players[0]!.victoryPoints).toBe(6);
+
+    const scoredForge = applyAction(
+      {
+        ...scoredKills.state,
+        turn: { ...scoredKills.state.turn, activePlayerId: human.id },
+      },
+      { type: 'play-card', playerId: human.id, cardId: charter.id },
+    );
+    expect(scoredForge.state.players[0]!.victoryPoints).toBe(8);
+
+    const paidCaptain = applyAction(
+      {
+        ...scoredForge.state,
+        turn: { ...scoredForge.state.turn, activePlayerId: human.id },
+      },
+      { type: 'play-card', playerId: human.id, cardId: captain.id },
+    );
+    expect(paidCaptain.state.players[0]!.resources.gold).toBe(
+      scoredForge.state.players[0]!.resources.gold + 4,
+    );
+  });
+
   it('awards a shared objective to the first player to satisfy it', () => {
     const objectivePool = [
       {
@@ -1076,6 +1188,64 @@ describe('headless match', () => {
     expect(
       cpuPlayed.events.some((event) => event.type === 'objective-claimed'),
     ).toBe(false);
+  });
+
+  it('claims objectives for played card categories', () => {
+    const ally: Card = {
+      id: 'ally-quest-card' as CardId,
+      name: 'Quest Ally',
+      category: 'ally',
+      cost: {},
+      effects: [{ type: 'gain-resource', resource: 'gold', amount: 1 }],
+      rulesText: 'Gain gold.',
+      target: 'none',
+      marketCopies: 0,
+    };
+    const objectivePool = [
+      {
+        id: 'ally-quest' as ObjectiveId,
+        name: 'Ally Quest',
+        description: 'Play an ally.',
+        victoryPoints: 4,
+        condition: {
+          type: 'category-cards-played',
+          category: 'ally',
+          amount: 1,
+        },
+      },
+    ] as const;
+    const state = createGame({
+      seed: 'category-objective',
+      humanFactionId: factions[0]!.id,
+      cpuFactionId: factions[1]!.id,
+      content: {
+        factions,
+        locations,
+        cards: [...cards, ally],
+        upgrades,
+        objectives: objectivePool,
+      },
+    }).state;
+    const human = state.players[0]!;
+    const primed = {
+      ...state,
+      players: state.players.map((player) =>
+        player.id === human.id ? { ...player, hand: [ally.id] } : player,
+      ),
+    };
+
+    const played = applyAction(primed, {
+      type: 'play-card',
+      playerId: human.id,
+      cardId: ally.id,
+    });
+    expect(played.state.objectives[0]?.claimedBy).toBe(human.id);
+    expect(played.events).toContainEqual(
+      expect.objectContaining({
+        type: 'objective-claimed',
+        objectiveId: 'ally-quest',
+      }),
+    );
   });
 
   it('plays typed effects and replenishes acquired market cards', () => {

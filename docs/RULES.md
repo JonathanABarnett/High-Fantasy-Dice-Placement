@@ -34,21 +34,24 @@ A slot already held by a rival can be contested. Placing a die there with a stri
 
 ## Crown quests
 
-Three shared objectives are drawn from a seeded pool at match start and shown to both players. They are first-come: the moment a player satisfies a condition, they claim its victory points permanently and no one else can take it. Conditions are data-driven and cover monsters slain, resources amassed, upgrades forged, cards played, and placements by location tag.
+Three shared objectives are drawn from a seeded pool at match start and shown to both players. They are first-come: the moment a player satisfies a condition, they claim its victory points permanently and no one else can take it. Conditions are data-driven and cover monsters slain, resources amassed, upgrades forged, cards played, ally/relic cards played, and placements by location tag.
 
 ## Cards and market
 
 Each faction begins with one unique tactic. A seeded deck supplies a three-card market. Acquiring a card pays its cost, puts it in hand, and replenishes the market; playing a card resolves its typed effects. Played cards enter the discard pile. Allies and relics are worth 1 point after they are played.
 
-Card effects cover resources, victory points, draws, and rerolls, plus three that reach into the board:
+Card effects cover resources, victory points, draws, and rerolls, plus several that reach into the board or reward a plan you have already built:
 
 - **Empower** raises a ready die's value for the rest of the round. A boosted die clears higher minimums, wins bumps, loots more overkill, and can even reach the value-6 threshold for a critical strike. The bonus is cleared when dice reroll, so it never becomes a permanent upgrade — that remains the Forge's job.
 - **Siege** wounds the raid boss without spending a die on it, but it can never reduce the beast below 1 health. The killing blow, and its bounty, must still be struck with a die.
 - **Steal** takes a resource from every rival, limited by what they actually hold. Unlike other income, it moves resources rather than creating them.
+- **Trophies** convert monsters you personally slew into victory points, making earlier combat placements matter again later.
+- **Forge payoffs** score your permanent die upgrades, pushing Forge Hall from a simple resource stop into a long-term engine.
+- **Tag payoffs** reward previous placements at a kind of location, such as Veteran Captain paying gold for combat placements.
 
 ## Forge and die faces
 
-Placing at Forge Hall unlocks upgrades for the rest of that round. An upgrade pays its resource cost and permanently replaces one chosen face on one chosen die. Upgraded resource symbols grant their matching resource whenever that face is later placed; a masterwork symbol grants 1 victory point. Enhancements also contribute their printed end-game score.
+Placing at Forge Hall unlocks upgrades for the rest of that round. An upgrade pays its resource cost and permanently replaces one chosen face on one chosen die. The upgrade shop now spans twelve faces: cheap reliability, value-5 and value-6 resource faces, flexible dual-symbol faces, and masterwork glory faces. Upgraded resource symbols grant their matching resource whenever that face is later placed; a masterwork symbol grants 1 victory point. Enhancements also contribute their printed end-game score.
 
 ## Faction passives
 

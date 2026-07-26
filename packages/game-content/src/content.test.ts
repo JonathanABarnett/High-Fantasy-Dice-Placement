@@ -17,9 +17,9 @@ describe('Milestone 1 content', () => {
   });
 
   it('defines unique executable cards with a stocked market', () => {
-    expect(cards).toHaveLength(20);
+    expect(cards).toHaveLength(26);
     expect(new Set(cards.map((card) => card.id)).size).toBe(cards.length);
-    expect(cards.filter((card) => card.marketCopies > 0)).toHaveLength(16);
+    expect(cards.filter((card) => card.marketCopies > 0)).toHaveLength(22);
     expect(cards.every((card) => card.effects.length > 0)).toBe(true);
   });
 
@@ -28,7 +28,14 @@ describe('Milestone 1 content', () => {
     const kinds = new Set(
       market.flatMap((card) => card.effects.map((effect) => effect.type)),
     );
-    for (const kind of ['boost-die', 'damage-raid', 'steal-resource'])
+    for (const kind of [
+      'boost-die',
+      'damage-raid',
+      'steal-resource',
+      'gain-victory-points-per-monster',
+      'gain-victory-points-per-upgrade',
+      'gain-resource-per-tag-placement',
+    ])
       expect(kinds).toContain(kind);
 
     // A die boost has to name a die, and any card that only softens the raid
@@ -41,9 +48,9 @@ describe('Milestone 1 content', () => {
     }
   });
 
-  it('defines six unique permanent face upgrades', () => {
-    expect(upgrades).toHaveLength(6);
-    expect(new Set(upgrades.map((upgrade) => upgrade.id)).size).toBe(6);
+  it('defines twelve unique permanent face upgrades', () => {
+    expect(upgrades).toHaveLength(12);
+    expect(new Set(upgrades.map((upgrade) => upgrade.id)).size).toBe(12);
     expect(upgrades.every((upgrade) => upgrade.scoreValue > 0)).toBe(true);
   });
 

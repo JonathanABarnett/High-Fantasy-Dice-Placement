@@ -157,14 +157,27 @@ test('plays a faction card through the typed effect system', async ({
 test('unlocks Forge Hall and permanently upgrades a die face', async ({
   page,
 }) => {
-  await page.goto('/');
-  // Pin a seed whose round-one board opens Forge Hall, rather than depending on
-  // whichever seed the setup screen happens to default to.
-  await page.getByLabel('Match seed').fill('shattered-crown-008');
-  await page.getByRole('button', { name: 'Start match' }).click();
-  await page.locator('.die:not([disabled])').first().click();
-  await page.getByText('Keyboard placement options').click();
-  await page.getByRole('button', { exact: true, name: 'Forge Hall' }).click();
+  let foundForgeRoute = false;
+  for (let seedIndex = 0; seedIndex < 40 && !foundForgeRoute; seedIndex += 1) {
+    await page.goto('/');
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    await page
+      .getByLabel('Match seed')
+      .fill(`shattered-crown-${seedIndex.toString().padStart(3, '0')}`);
+    await page.getByRole('button', { name: 'Start match' }).click();
+    await page.locator('.die:not([disabled])').first().click();
+    await page.getByText('Keyboard placement options').click();
+    const forgeRoute = page.getByRole('button', {
+      exact: true,
+      name: 'Forge Hall',
+    });
+    if (await forgeRoute.isEnabled()) {
+      await forgeRoute.click();
+      foundForgeRoute = true;
+    }
+  }
+  expect(foundForgeRoute).toBe(true);
   const forgePanel = page.getByRole('region', { name: 'Forge upgrades' });
   await expect(forgePanel).toBeVisible();
   const forgeButton = forgePanel.getByRole('button', { name: 'Forge' }).first();

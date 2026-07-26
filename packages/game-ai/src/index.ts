@@ -63,6 +63,32 @@ export function evaluateCpuActions(
           return total + effect.amount * RESOURCE_VALUES[effect.resource];
         if (effect.type === 'gain-victory-points')
           return total + effect.amount * 3;
+        if (effect.type === 'gain-victory-points-per-monster') {
+          const amount = Math.min(
+            effect.maxAmount ?? Number.POSITIVE_INFINITY,
+            player.monstersSlain * effect.amountPerMonster,
+          );
+          return total + amount * 3;
+        }
+        if (effect.type === 'gain-victory-points-per-upgrade') {
+          const upgradesForged = player.dice.reduce(
+            (sum, die) => sum + die.enhancements.length,
+            0,
+          );
+          const amount = Math.min(
+            effect.maxAmount ?? Number.POSITIVE_INFINITY,
+            upgradesForged * effect.amountPerUpgrade,
+          );
+          return total + amount * 3;
+        }
+        if (effect.type === 'gain-resource-per-tag-placement') {
+          const amount = Math.min(
+            effect.maxAmount ?? Number.POSITIVE_INFINITY,
+            (player.placementCounts[effect.tag] ?? 0) *
+              effect.amountPerPlacement,
+          );
+          return total + amount * RESOURCE_VALUES[effect.resource];
+        }
         if (effect.type === 'draw-card') return total + effect.amount * 1.25;
         if (effect.type === 'steal-resource') {
           // Taking is worth roughly double gaining: it swings both scores.
@@ -109,6 +135,12 @@ export function evaluateCpuActions(
           if (effect.type === 'gain-victory-points')
             return total + effect.amount * 2;
           if (effect.type === 'gain-resource') return total + effect.amount;
+          if (effect.type === 'gain-victory-points-per-monster')
+            return total + effect.amountPerMonster * 1.6;
+          if (effect.type === 'gain-victory-points-per-upgrade')
+            return total + effect.amountPerUpgrade * 1.5;
+          if (effect.type === 'gain-resource-per-tag-placement')
+            return total + effect.amountPerPlacement * 1.2;
           if (effect.type === 'draw-card') return total + effect.amount;
           return total + 0.8;
         },
