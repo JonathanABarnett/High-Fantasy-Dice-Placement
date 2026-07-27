@@ -13,7 +13,7 @@ Combat and competition turn raw dice values into drama:
 
 All four factions are playable and pull on these systems differently: Ember are the fastest dragonslayers, Stonebound are hardest to shift off a slot, Arcanum displace rivals cheaply with magic, and Verdant field a sixth die and profit from being bumped.
 
-Choose **Learn to play** on the setup screen for a guided nine-step walkthrough. During a match, **How to play** reopens it without changing match state. The tutorial supports Back/Next controls, clickable progress markers, Left/Right Arrow navigation, and Escape to close.
+Choose **Learn to play** on the setup screen for a guided fifteen-step walkthrough. During a match, **How to play** reopens it without changing match state. The tutorial supports Back/Next controls, clickable progress markers, Left/Right Arrow navigation, and Escape to close, and now teaches the collapsible command panels alongside placement, cards, Forge upgrades, combat, raids, bumping, and Crown Quests.
 
 Hover or keyboard-focus resource and card-category tokens for rule explanations. Each two-player round opens six regions and eight contested slots, with more slots opening automatically for larger player counts; the rest are visibly sealed. Selecting a die makes every open board location display a textual **Playable**, **Blocked**, or **Full** state, while individual slots show their value, affinity, and payment requirements.
 

@@ -23,7 +23,7 @@ Implemented two-player setup, four initial factions, five dice per player, twelv
 
 ## Milestone 3 — Cards and dice upgrades
 
-**Status:** complete as a playable systems layer. Four starting cards and ten market cards use typed deterministic effects; the market replenishes from a seeded deck; hands and card actions are playable in the browser; six Forge-gated upgrades permanently replace die faces with resource or masterwork symbols; upgrade costs, previews, scoring, saves, logs, CPU evaluation, a replayable nine-step visual tutorial, and deterministic player-count-scaled board scarcity are integrated.
+**Status:** complete as a playable systems layer. Four starting cards and a deeper market use typed deterministic effects; the market replenishes from a seeded deck; hands and card actions are playable in the browser; twelve Forge-gated upgrades permanently replace die faces with resource, dual-symbol, or masterwork symbols; upgrade costs, previews, scoring, saves, collapsible panels, CPU evaluation, a replayable visual tutorial, and deterministic player-count-scaled board scarcity are integrated.
 
 ## Milestone 4 — Content and polish
 
@@ -34,7 +34,7 @@ Implemented two-player setup, four initial factions, five dice per player, twelv
 - **Bumping**, letting a strictly higher die plus one influence drive a rival off a contested slot.
 - **Crown quests**: three seeded, first-come shared objectives with typed conditions.
 
-All four faction identities are also complete, each with a distinct grip on these systems, and the thirteen-step tutorial now teaches hunts, the raid, bumping, and quests. The market has grown to twenty-six cards, including empower, siege, steal, trophy, forged-face, and tag-payoff effects that reach into combat, rivalry, and long-term engines rather than only granting income. The Forge shop has grown to twelve permanent faces, including dual-symbol and masterwork lines. State moved to schema v4 (shared objectives and raid damage). Remaining: audio placeholders, deeper AI personality, end-game scoring presentation, and more late-game content.
+All four faction identities are also complete, each with a distinct grip on these systems, and the fifteen-step tutorial now teaches panel management, hunts, the raid, bumping, card engines, expanded Forge upgrades, and quests. The market has grown to twenty-six cards, including empower, siege, steal, trophy, forged-face, and tag-payoff effects that reach into combat, rivalry, and long-term engines rather than only granting income. The Forge shop has grown to twelve permanent faces, including dual-symbol and masterwork lines. State moved to schema v4 (shared objectives and raid damage). Remaining: audio placeholders, deeper AI personality, end-game scoring presentation, and more late-game content.
 
 ## Deferred
 

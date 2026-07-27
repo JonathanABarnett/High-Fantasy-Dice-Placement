@@ -364,6 +364,7 @@ select {
   gap: 0.75rem;
   max-width: 122rem;
   margin: auto;
+  align-items: start;
 }
 .board-stage {
   min-width: 0;
@@ -496,6 +497,10 @@ select {
   border-radius: 0.65rem;
   background: rgb(18 16 14 / 94%);
 }
+.dice-panel {
+  display: flex;
+  flex-direction: column;
+}
 .dice-panel h2,
 .log-panel h2 {
   margin-bottom: 0.35rem;
@@ -569,7 +574,59 @@ select {
 .die[draggable='true']:active {
   cursor: grabbing;
 }
+.turn-summary {
+  order: 1;
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.65rem;
+  padding: 0.65rem;
+  border: 1px solid #5d4930;
+  border-radius: 0.55rem;
+  background:
+    linear-gradient(135deg, rgb(80 55 27 / 42%), transparent 75%), #17130f;
+}
+.turn-summary > div:not(.panel-shortcuts) {
+  display: grid;
+  gap: 0.16rem;
+}
+.turn-summary strong {
+  color: #f0d39c;
+  font-size: 0.76rem;
+}
+.turn-summary span {
+  color: #ab9d87;
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+.turn-summary .pass {
+  margin-top: 0;
+}
+.turn-summary .token-list {
+  display: inline-flex;
+  vertical-align: middle;
+}
+.panel-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.3rem;
+}
+.panel-shortcut {
+  min-width: 0;
+  padding: 0.34rem 0.25rem;
+  color: #cdb58a;
+  background: #211910;
+  font-size: 0.58rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.panel-shortcut.is-open {
+  border-color: #d2a553;
+  color: #211609;
+  background: #d9ad5e;
+}
 .pressure-panel {
+  order: 5;
   margin-top: 0.75rem;
   padding: 0.7rem;
   border: 1px solid #51412e;
@@ -612,8 +669,9 @@ select {
   line-height: 1.4;
 }
 .location-preview {
+  order: 4;
   min-height: 8.3rem;
-  margin-top: 0.9rem;
+  margin-top: 0.75rem;
   padding: 0.8rem;
   border: 1px solid #4b3d2d;
   border-radius: 0.5rem;
@@ -621,11 +679,23 @@ select {
 }
 .card-panel,
 .forge-panel {
+  order: 7;
   margin-top: 0.9rem;
   padding: 0.75rem;
   border: 1px solid #4b3d2d;
   border-radius: 0.5rem;
   background: #151310;
+}
+.forge-panel {
+  order: 8;
+}
+.pressure-panel,
+.location-preview,
+.quest-panel,
+.card-panel,
+.forge-panel,
+.log-panel {
+  scroll-margin-top: 9rem;
 }
 .panel-heading {
   display: flex;
@@ -993,6 +1063,7 @@ select {
   color: #ffb59a !important;
 }
 .quest-panel {
+  order: 6;
   margin-top: 0.8rem;
   padding: 0.6rem 0.65rem;
   border: 1px solid #4a3f2e;
@@ -1052,6 +1123,7 @@ select {
   color: #df9e90;
 }
 .accessible-actions {
+  order: 3;
   margin-top: 0.8rem;
   color: #c8b898;
   font-size: 0.75rem;

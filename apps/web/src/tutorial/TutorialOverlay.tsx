@@ -41,6 +41,14 @@ const STEPS: readonly TutorialStep[] = [
     tip: 'A placed die stays occupied until the round ends.',
   },
   {
+    anchor: 'dice',
+    eyebrow: 'Keep the table clear',
+    title: 'Use the command center',
+    symbol: '◇',
+    body: 'Your dice, pass button, and round pressure live together in the turn panel because they are the controls you use every round. Reference panels can be opened only when you need them.',
+    tip: 'If the table feels crowded, collapse cards, quests, forge, or the log. The board and dice should remain your main loop.',
+  },
+  {
     anchor: 'board',
     eyebrow: 'The realm',
     title: 'Place dice to gain rewards',
@@ -53,8 +61,16 @@ const STEPS: readonly TutorialStep[] = [
     eyebrow: 'Plan before committing',
     title: 'Inspect rewards and restrictions',
     symbol: '☰',
-    body: 'Hover or click a location to pin its reward and slot requirements in this panel. With a die selected, the panel explains why each slot is legal or blocked.',
-    tip: 'The reward and requirement icons here have their own hover and keyboard-focus explanations.',
+    body: 'Hover or click a location to pin its reward and slot requirements near your dice. With a die selected, this panel explains why each slot is playable, blocked, full, or bumpable.',
+    tip: 'The reward and requirement icons here have their own hover and keyboard-focus explanations, so you do not have to chase tiny symbols on the map.',
+  },
+  {
+    anchor: 'preview',
+    eyebrow: 'Keep the table clear',
+    title: 'Open only the panels you need',
+    symbol: '▾',
+    body: 'Most side panels can collapse. Keep Location Preview open while choosing a placement, then show quests, cards, Forge, pressure, or the log only when that decision needs them.',
+    tip: 'The dice and location preview are your main turn tools. The rest is supporting information.',
   },
   {
     anchor: 'hunt-location',
@@ -83,26 +99,26 @@ const STEPS: readonly TutorialStep[] = [
   {
     anchor: 'cards',
     eyebrow: 'Schemes and allies',
-    title: 'Play cards or visit the market',
+    title: 'Play cards, buy engines',
     symbol: '✦',
-    body: 'Your faction begins with a unique card. Playing or acquiring a card uses your turn. The three-card market refills from the seeded deck.',
-    tip: 'Some cards need a ready die selected as their target.',
+    body: 'Your faction begins with a unique card. Playing or acquiring a card uses your turn. The market includes immediate tactics plus payoff cards that cash in monsters slain, combat placements, and forged die faces.',
+    tip: 'Some cards need a ready die selected as their target. Cards and market can be collapsed between buys to keep the table compact.',
   },
   {
     anchor: 'forge-location',
     eyebrow: 'Permanent power',
     title: 'Unlock upgrades at Forge Hall',
     symbol: '⚒',
-    body: 'When Forge Hall is open this round, place a die there to reveal the Forge panel. Then spend materials to permanently replace one face on any of your dice.',
-    tip: 'If Forge Hall is sealed, plan around materials now and watch for it in a later round.',
+    body: 'When Forge Hall is open this round, place a die there to reveal the Forge panel. Then spend materials to permanently replace one face on any die with one of twelve upgrade faces.',
+    tip: 'Cheap faces make bad rolls reliable, high faces reach harder slots, dual-symbol faces generate resources, and masterwork faces score when placed.',
   },
   {
     anchor: 'quests',
     eyebrow: 'Race the realm',
     title: 'Claim the Crown Quests first',
     symbol: '★',
-    body: 'Three shared quests are drawn each match and both players chase the same three. The moment someone meets one, its points are theirs and it can never be taken back.',
-    tip: 'Check these early: a quest you are already close to can be worth redirecting a whole round to finish before your rival does.',
+    body: 'Three shared quests are drawn each match and both players chase the same three. Quests can care about monsters, resources, upgrades, placements, cards played, or even ally and relic cards specifically.',
+    tip: 'The moment someone meets a quest, its points are theirs forever. Open this panel early, choose a race, then collapse it until you need a reminder.',
   },
   {
     anchor: 'pass',
@@ -117,8 +133,8 @@ const STEPS: readonly TutorialStep[] = [
     eyebrow: 'The final reckoning',
     title: 'Follow the log and build your score',
     symbol: '♜',
-    body: 'The log records every resolved rule. After round six, victory points, reserves, faction scoring, played allies and relics, and die enhancements are totaled.',
-    tip: 'Everything is deterministic: the same seed and choices produce the same match.',
+    body: 'The log starts collapsed to save space. Open it when you want to verify exactly what resolved, then collapse it again so the board remains the focus.',
+    tip: 'After round six, victory points, reserves, faction scoring, played allies and relics, and die enhancements are totaled. Same seed and choices, same match.',
   },
 ];
 
@@ -225,6 +241,7 @@ export function TutorialOverlay({
         </button>
         <div
           className="tutorial-progress"
+          style={{ gridTemplateColumns: `repeat(${STEPS.length}, 1fr)` }}
           aria-label={`Step ${stepIndex + 1} of ${STEPS.length}`}
         >
           {STEPS.map((item, index) => (

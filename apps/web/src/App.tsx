@@ -310,11 +310,31 @@ export function App() {
   );
   const selectedDie =
     human?.dice.find((die) => die.id === selectedDieId) ?? null;
+  const selectedDieRoutes = useMemo(() => {
+    if (!game || !selectedDieId) return [];
+    return legalActions.filter(
+      (action) =>
+        (action.type === 'place-die' || action.type === 'bump-die') &&
+        action.dieId === selectedDieId,
+    );
+  }, [game, legalActions, selectedDieId]);
+  const inspectLocation = (locationId: LocationId | null) => {
+    setInspectedLocationId(locationId);
+    if (locationId)
+      setCollapsedPanels((current) => ({ ...current, preview: false }));
+  };
+  const selectDieForPlanning = (dieId: DieId) => {
+    setSelectedDieId(dieId);
+    if (inspectedLocationId)
+      setCollapsedPanels((current) => ({ ...current, preview: false }));
+  };
   const togglePanel = (panel: CollapsiblePanelId) =>
     setCollapsedPanels((current) => ({
       ...current,
       [panel]: !current[panel],
     }));
+  const showPanel = (panel: CollapsiblePanelId) =>
+    setCollapsedPanels((current) => ({ ...current, [panel]: false }));
   const pressure = useMemo(() => {
     if (!game || !human) return null;
     const openLocations = game.locations.filter(
@@ -361,6 +381,14 @@ export function App() {
       lowDiceWithRoutes: lowDiceWithRoutes.length,
     };
   }, [game, human, legalActions]);
+  const forgeUnlocked = Boolean(
+    human &&
+    game?.locations.some(
+      (location) =>
+        location.tags.includes('forge') &&
+        location.slots.some((slot) => slot.occupantPlayerId === human.id),
+    ),
+  );
 
   const appendEvents = (events: readonly GameEvent[], nextState: GameState) => {
     setLog((current) =>
@@ -698,7 +726,7 @@ export function App() {
                 game={game}
                 humanPlayerId={human.id}
                 legalActions={legalActions}
-                onInspectLocation={setInspectedLocationId}
+                onInspectLocation={inspectLocation}
                 onPlaceAtLocation={placeAtLocation}
                 reducedMotion={reducedMotion}
                 selectedDieId={selectedDieId}
@@ -718,7 +746,7 @@ export function App() {
             </div>
           </section>
 
-          <aside className="sidebar">
+          <aside className="sidebar" data-tutorial="war-table">
             <section className="dice-panel">
               <h2>Your dice</h2>
               <p>Select a ready die, then choose a highlighted slot.</p>
@@ -753,10 +781,10 @@ export function App() {
                           'application/x-shattered-die',
                           die.id,
                         );
-                        setSelectedDieId(die.id);
+                        selectDieForPlanning(die.id);
                       }}
                       key={die.id}
-                      onClick={() => setSelectedDieId(die.id)}
+                      onClick={() => selectDieForPlanning(die.id)}
                       type="button"
                     >
                       <span aria-hidden="true" className="die-glyph">
@@ -769,6 +797,115 @@ export function App() {
                   );
                 })}
               </div>
+              <section className="turn-summary" aria-label="Current turn plan">
+                <div>
+                  <strong>
+                    {selectedDie
+                      ? `${AFFINITY_INFO[selectedDie.affinity].icon} Value ${dieValue(selectedDie)} ${AFFINITY_INFO[selectedDie.affinity].label}`
+                      : activePlayer?.controller === 'human'
+                        ? 'Choose a die or card'
+                        : 'CPU is planning'}
+                  </strong>
+                  <span>
+                    {selectedDie
+                      ? `${selectedDieRoutes.length} legal route${selectedDieRoutes.length === 1 ? '' : 's'} available`
+                      : inspectedLocation
+                        ? `Inspecting ${inspectedLocation.name}`
+                        : 'Select a die to light up playable spaces.'}
+                  </span>
+                </div>
+                {inspectedLocation && (
+                  <div>
+                    <strong>{inspectedLocation.name}</strong>
+                    <span>
+                      Reward:{' '}
+                      <ResourceList
+                        includeVictoryPoints
+                        values={inspectedLocation.reward}
+                      />
+                    </span>
+                  </div>
+                )}
+                <div className="panel-shortcuts" aria-label="Open info panels">
+                  <button
+                    className={
+                      collapsedPanels.preview
+                        ? 'panel-shortcut'
+                        : 'panel-shortcut is-open'
+                    }
+                    disabled={!inspectedLocation}
+                    onClick={() => showPanel('preview')}
+                    type="button"
+                  >
+                    Preview
+                  </button>
+                  <button
+                    className={
+                      collapsedPanels.cards
+                        ? 'panel-shortcut'
+                        : 'panel-shortcut is-open'
+                    }
+                    onClick={() => showPanel('cards')}
+                    type="button"
+                  >
+                    Cards
+                  </button>
+                  <button
+                    className={
+                      collapsedPanels.quests
+                        ? 'panel-shortcut'
+                        : 'panel-shortcut is-open'
+                    }
+                    onClick={() => showPanel('quests')}
+                    type="button"
+                  >
+                    Quests
+                  </button>
+                  <button
+                    className={
+                      collapsedPanels.forge
+                        ? 'panel-shortcut'
+                        : 'panel-shortcut is-open'
+                    }
+                    disabled={!forgeUnlocked}
+                    onClick={() => showPanel('forge')}
+                    type="button"
+                  >
+                    Forge
+                  </button>
+                  <button
+                    className={
+                      collapsedPanels.log
+                        ? 'panel-shortcut'
+                        : 'panel-shortcut is-open'
+                    }
+                    onClick={() => showPanel('log')}
+                    type="button"
+                  >
+                    Log
+                  </button>
+                </div>
+                <button
+                  className="pass"
+                  data-tutorial="pass"
+                  disabled={
+                    activePlayer?.controller !== 'human' ||
+                    !legalActions.some((action) => action.type === 'pass')
+                  }
+                  onClick={() =>
+                    human &&
+                    submitHumanAction({ type: 'pass', playerId: human.id })
+                  }
+                  type="button"
+                >
+                  Pass for this round
+                </button>
+              </section>
+              {error && (
+                <p className="notice" role="status">
+                  {error}
+                </p>
+              )}
               {pressure && (
                 <CollapsiblePanel
                   ariaLabel="Round pressure"
@@ -811,7 +948,7 @@ export function App() {
               )}
               {game.objectives.length > 0 && (
                 <CollapsiblePanel
-                  aria-label="Crown quests"
+                  ariaLabel="Crown quests"
                   className="quest-panel"
                   contentId="crown-quests-panel"
                   dataTutorial="quests"
@@ -967,112 +1104,103 @@ export function App() {
                 </div>
               </CollapsiblePanel>
 
-              {human &&
-                game.locations.some(
-                  (location) =>
-                    location.tags.includes('forge') &&
-                    location.slots.some(
-                      (slot) => slot.occupantPlayerId === human.id,
-                    ),
-                ) && (
-                  <CollapsiblePanel
-                    ariaLabel="Forge upgrades"
-                    className="forge-panel"
-                    contentId="forge-upgrades-panel"
-                    open={!collapsedPanels.forge}
-                    summary="Permanent upgrades"
-                    title="Forge Hall"
-                    onToggle={() => togglePanel('forge')}
-                  >
-                    <div className="forge-controls">
-                      <label>
-                        Die
-                        <select
-                          value={upgradeDieId ?? ''}
-                          onChange={(event) =>
-                            setUpgradeDieId(event.target.value as DieId)
+              {forgeUnlocked && human && (
+                <CollapsiblePanel
+                  ariaLabel="Forge upgrades"
+                  className="forge-panel"
+                  contentId="forge-upgrades-panel"
+                  open={!collapsedPanels.forge}
+                  summary="Permanent upgrades"
+                  title="Forge Hall"
+                  onToggle={() => togglePanel('forge')}
+                >
+                  <div className="forge-controls">
+                    <label>
+                      Die
+                      <select
+                        value={upgradeDieId ?? ''}
+                        onChange={(event) =>
+                          setUpgradeDieId(event.target.value as DieId)
+                        }
+                      >
+                        {human.dice.map((die, index) => (
+                          <option key={die.id} value={die.id}>
+                            Die {index + 1} · {die.affinity}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Face to replace
+                      <select
+                        value={upgradeFaceIndex}
+                        onChange={(event) =>
+                          setUpgradeFaceIndex(Number(event.target.value))
+                        }
+                      >
+                        {(
+                          human.dice.find((die) => die.id === upgradeDieId)
+                            ?.faces ??
+                          human.dice[0]?.faces ??
+                          []
+                        ).map((face, index) => (
+                          <option key={index} value={index}>
+                            Face {index + 1}: value {face.value}
+                            {face.symbols.length
+                              ? ` · ${face.symbols.join(', ')}`
+                              : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  <div className="upgrade-list">
+                    {game.upgrades.map((upgrade) => {
+                      const action: GameAction | null = upgradeDieId
+                        ? {
+                            type: 'upgrade-die',
+                            playerId: human.id,
+                            dieId: upgradeDieId,
+                            faceIndex: upgradeFaceIndex,
+                            upgradeId: upgrade.id,
                           }
-                        >
-                          {human.dice.map((die, index) => (
-                            <option key={die.id} value={die.id}>
-                              Die {index + 1} · {die.affinity}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label>
-                        Face to replace
-                        <select
-                          value={upgradeFaceIndex}
-                          onChange={(event) =>
-                            setUpgradeFaceIndex(Number(event.target.value))
-                          }
-                        >
-                          {(
-                            human.dice.find((die) => die.id === upgradeDieId)
-                              ?.faces ??
-                            human.dice[0]?.faces ??
-                            []
-                          ).map((face, index) => (
-                            <option key={index} value={index}>
-                              Face {index + 1}: value {face.value}
-                              {face.symbols.length
-                                ? ` · ${face.symbols.join(', ')}`
-                                : ''}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-                    <div className="upgrade-list">
-                      {game.upgrades.map((upgrade) => {
-                        const action: GameAction | null = upgradeDieId
-                          ? {
-                              type: 'upgrade-die',
-                              playerId: human.id,
-                              dieId: upgradeDieId,
-                              faceIndex: upgradeFaceIndex,
-                              upgradeId: upgrade.id,
+                        : null;
+                      const legal = action
+                        ? validateAction(game, action).legal
+                        : false;
+                      return (
+                        <article className="upgrade" key={upgrade.id}>
+                          <div>
+                            <strong>{upgrade.name}</strong>
+                            <p>{upgrade.description}</p>
+                            <small>
+                              <span className="upgrade-meta">
+                                <span>Cost</span>
+                                <ResourceList values={upgrade.cost} />
+                                <span>Scores</span>
+                                <ResourceToken
+                                  compact
+                                  resource="victoryPoints"
+                                  value={upgrade.scoreValue}
+                                />
+                              </span>
+                            </small>
+                          </div>
+                          <button
+                            disabled={
+                              !legal || activePlayer?.controller !== 'human'
                             }
-                          : null;
-                        const legal = action
-                          ? validateAction(game, action).legal
-                          : false;
-                        return (
-                          <article className="upgrade" key={upgrade.id}>
-                            <div>
-                              <strong>{upgrade.name}</strong>
-                              <p>{upgrade.description}</p>
-                              <small>
-                                <span className="upgrade-meta">
-                                  <span>Cost</span>
-                                  <ResourceList values={upgrade.cost} />
-                                  <span>Scores</span>
-                                  <ResourceToken
-                                    compact
-                                    resource="victoryPoints"
-                                    value={upgrade.scoreValue}
-                                  />
-                                </span>
-                              </small>
-                            </div>
-                            <button
-                              disabled={
-                                !legal || activePlayer?.controller !== 'human'
-                              }
-                              onClick={() =>
-                                action && submitHumanAction(action)
-                              }
-                              type="button"
-                            >
-                              Forge
-                            </button>
-                          </article>
-                        );
-                      })}
-                    </div>
-                  </CollapsiblePanel>
-                )}
+                            onClick={() => action && submitHumanAction(action)}
+                            type="button"
+                          >
+                            Forge
+                          </button>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </CollapsiblePanel>
+              )}
               <CollapsiblePanel
                 className="location-preview"
                 ariaLive="polite"
@@ -1367,26 +1495,6 @@ export function App() {
                     })}
                   </div>
                 </details>
-              )}
-              <button
-                className="pass"
-                data-tutorial="pass"
-                disabled={
-                  activePlayer?.controller !== 'human' ||
-                  !legalActions.some((action) => action.type === 'pass')
-                }
-                onClick={() =>
-                  human &&
-                  submitHumanAction({ type: 'pass', playerId: human.id })
-                }
-                type="button"
-              >
-                Pass for this round
-              </button>
-              {error && (
-                <p className="notice" role="status">
-                  {error}
-                </p>
               )}
             </section>
             <CollapsiblePanel
