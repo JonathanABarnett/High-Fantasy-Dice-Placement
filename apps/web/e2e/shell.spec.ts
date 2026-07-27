@@ -3,9 +3,8 @@ import { expect, type Page, test } from '@playwright/test';
 test.describe.configure({ mode: 'serial' });
 
 async function openMatchLog(page: Page) {
+  await page.getByRole('button', { name: 'Log' }).click();
   const log = page.locator('.log-panel');
-  const show = log.getByRole('button', { name: 'Show' });
-  if (await show.isVisible()) await show.click();
   return log;
 }
 
@@ -25,12 +24,11 @@ test('starts a deterministic human-versus-CPU match', async ({ page }) => {
   await expect(page.locator('.placement-guide')).toContainText(
     '6 active regions · 8 contested slots',
   );
+  await page.getByRole('button', { name: 'Pressure' }).click();
   await expect(
     page.getByRole('region', { name: 'Round pressure' }),
   ).toContainText('8/8 slots left');
-  await expect(
-    page.getByRole('button', { name: 'Show' }).first(),
-  ).toBeVisible();
+  await page.getByRole('button', { name: 'Log' }).click();
   await expect(page.locator('.log-panel')).toContainText('entries');
 });
 
@@ -88,6 +86,9 @@ test('pins location details and exposes preview icon explanations', async ({
   );
   await page.locator('.die:not([disabled])').first().click();
   await expect(preview).toContainText(/PLAYABLE|BLOCKED/);
+  await expect(page.locator('.decision-dock')).toContainText(
+    /Playable|Blocked/,
+  );
 });
 
 test('guides a new player through the complete visual tutorial', async ({

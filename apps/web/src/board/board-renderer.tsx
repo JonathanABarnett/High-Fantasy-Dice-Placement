@@ -24,10 +24,10 @@ import boardMapUrl from '../../../../assets/generated/board/shattered-realms-map
 const BOARD_WIDTH = 1200;
 const BOARD_HEIGHT = 760;
 const CARD_WIDTH = 250;
-const CARD_HEIGHT = 176;
-const SLOT_SIZE = 34;
+const CARD_HEIGHT = 184;
+const SLOT_SIZE = 42;
 const SLOT_Y = 132;
-const SLOT_GAP = 44;
+const SLOT_GAP = 52;
 const SLOT_CENTER_Y = SLOT_Y + SLOT_SIZE / 2;
 
 interface BoardPoint {
@@ -92,7 +92,9 @@ export interface BoardRendererProps {
   readonly selectedDieId: DieId | null;
   readonly legalActions: readonly GameAction[];
   readonly reducedMotion: boolean;
-  readonly onInspectLocation: (locationId: LocationId | null) => void;
+  readonly pinnedLocationId?: LocationId | null;
+  readonly onHoverLocation: (locationId: LocationId | null) => void;
+  readonly onPinLocation: (locationId: LocationId | null) => void;
   readonly onPlaceAtLocation: (
     locationId: LocationId,
     dieId: DieId | null,
@@ -150,10 +152,12 @@ export function BoardRenderer(props: BoardRendererProps) {
   const appRef = useRef<Application | null>(null);
   const mapTextureRef = useRef<Texture | null>(null);
   const pulseRef = useRef<(() => void) | null>(null);
-  const inspectRef = useRef(props.onInspectLocation);
+  const hoverRef = useRef(props.onHoverLocation);
+  const pinRef = useRef(props.onPinLocation);
   const placeRef = useRef(props.onPlaceAtLocation);
   const [ready, setReady] = useState(false);
-  inspectRef.current = props.onInspectLocation;
+  hoverRef.current = props.onHoverLocation;
+  pinRef.current = props.onPinLocation;
   placeRef.current = props.onPlaceAtLocation;
 
   useEffect(() => {
@@ -246,6 +250,7 @@ export function BoardRenderer(props: BoardRendererProps) {
       const openSlots = location.slots.filter((slot) => slot.isOpen !== false);
       const legal =
         props.selectedDieId !== null && legalLocationIds.has(location.id);
+      const pinned = props.pinnedLocationId === location.id;
       const occupied = location.slots.filter(
         (slot) => slot.occupantDieId,
       ).length;
@@ -271,9 +276,9 @@ export function BoardRenderer(props: BoardRendererProps) {
           placeRef.current(location.id, props.selectedDieId);
           return;
         }
-        inspectRef.current(location.id);
+        pinRef.current(location.id);
       });
-      card.on('pointerover', () => inspectRef.current(location.id));
+      card.on('pointerover', () => hoverRef.current(location.id));
 
       const highlight = new Graphics()
         .roundRect(0, 0, CARD_WIDTH, CARD_HEIGHT, 18)
@@ -289,11 +294,18 @@ export function BoardRenderer(props: BoardRendererProps) {
         })
         .stroke({
           color: !isActive ? 0x5d5d5d : legal ? 0x78efac : 0xc9a66a,
-          width: legal ? 5 : isActive ? 1 : 2,
-          alpha: legal ? 1 : isActive ? 0.22 : 0.7,
+          width: legal ? 5 : pinned ? 4 : isActive ? 1 : 2,
+          alpha: legal ? 1 : pinned ? 0.95 : isActive ? 0.22 : 0.7,
         });
       if (legal) pulseTargets.push(highlight);
       card.addChild(highlight);
+      if (pinned) {
+        card.addChild(
+          new Graphics()
+            .roundRect(-5, -5, CARD_WIDTH + 10, CARD_HEIGHT + 10, 22)
+            .stroke({ color: 0xf1c66f, width: 4, alpha: 0.96 }),
+        );
+      }
       if (!isActive || (props.selectedDieId && !legal)) {
         card.addChild(
           new Graphics()
@@ -402,7 +414,7 @@ export function BoardRenderer(props: BoardRendererProps) {
       }
 
       const plaque = new Graphics()
-        .roundRect(0, 86, CARD_WIDTH, 86, 13)
+        .roundRect(0, 82, CARD_WIDTH, 96, 13)
         .fill({ color: 0x130f0d, alpha: 0.86 })
         .stroke({
           color: legal ? 0x78efac : 0xd0a65d,
@@ -442,6 +454,7 @@ export function BoardRenderer(props: BoardRendererProps) {
         const x = 15 + slotIndex * SLOT_GAP;
         const slotOpen = slot.isOpen !== false;
         const slotLegal = slotOpen && legalSlotIds.has(slot.id);
+        const slotBumpable = bumpableSlotIds.has(slot.id);
         const die = new Graphics().roundRect(
           x,
           SLOT_Y,
@@ -452,7 +465,7 @@ export function BoardRenderer(props: BoardRendererProps) {
         if (!slotOpen) {
           die
             .fill({ color: 0x0c0b0a, alpha: 0.9 })
-            .stroke({ color: 0x5e5c58, width: 1, alpha: 0.9 });
+            .stroke({ color: 0x77736b, width: 2, alpha: 0.92 });
           const sealed = new Text({
             text: 'SEALED',
             style: {
@@ -467,34 +480,42 @@ export function BoardRenderer(props: BoardRendererProps) {
           card.addChild(die, sealed);
         } else if (slot.occupantDieId) {
           const human = slot.occupantPlayerId === props.humanPlayerId;
-          const bumpable = bumpableSlotIds.has(slot.id);
           die.fill({ color: human ? 0x397f5a : 0x9a4b3f }).stroke({
-            color: bumpable ? 0xffd24a : human ? 0xa9ffd0 : 0xffb29f,
-            width: bumpable ? 3 : 2,
+            color: slotBumpable ? 0xffd24a : human ? 0xa9ffd0 : 0xffb29f,
+            width: slotBumpable ? 4 : 2,
           });
           const owner = new Text({
-            text: bumpable ? '⚡' : human ? 'YOU' : 'CPU',
+            text: slotBumpable ? '⚡' : human ? 'YOU' : 'CPU',
             style: {
-              fill: bumpable ? 0xffe89a : 0xffffff,
+              fill: slotBumpable ? 0xffe89a : 0xffffff,
               fontFamily: 'Arial',
-              fontSize: bumpable ? 13 : 10,
+              fontSize: slotBumpable ? 16 : 11,
               fontWeight: 'bold',
             },
           });
           owner.anchor.set(0.5);
           owner.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y);
           card.addChild(die, owner);
-          if (bumpable) pulseTargets.push(die);
+          if (slotBumpable) pulseTargets.push(die);
         } else {
-          die.fill({ color: 0x171511, alpha: 0.7 }).stroke({
-            color: props.selectedDieId
-              ? slotLegal
-                ? 0x78efac
-                : 0xa85e50
-              : 0x8a7352,
-            width: slotLegal ? 3 : 2,
-            alpha: 1,
-          });
+          die
+            .fill({
+              color: props.selectedDieId
+                ? slotLegal
+                  ? 0x123f2b
+                  : 0x331a17
+                : 0x171511,
+              alpha: props.selectedDieId ? 0.94 : 0.78,
+            })
+            .stroke({
+              color: props.selectedDieId
+                ? slotLegal
+                  ? 0x78efac
+                  : 0xa85e50
+                : 0x8a7352,
+              width: slotLegal ? 4 : 2,
+              alpha: 1,
+            });
           const requirement = new Text({
             text: `${props.selectedDieId ? (slotLegal ? '✓ ' : '× ') : ''}${requirementLabel(slot.requirement)}`,
             style: {
@@ -504,7 +525,7 @@ export function BoardRenderer(props: BoardRendererProps) {
                   : 0xd99588
                 : 0xd6bd8f,
               fontFamily: 'Arial',
-              fontSize: 8.5,
+              fontSize: 9,
               fontWeight: 'bold',
             },
           });
@@ -518,7 +539,7 @@ export function BoardRenderer(props: BoardRendererProps) {
         text: `${occupied}/${openSlots.length} slots`,
         style: { fill: 0xd6bd8f, fontFamily: 'Arial', fontSize: 10 },
       });
-      occupancy.position.set(196, 149);
+      occupancy.position.set(190, 150);
       card.addChild(occupancy);
       app.stage.addChild(card);
     });
@@ -537,6 +558,7 @@ export function BoardRenderer(props: BoardRendererProps) {
     props.game,
     props.humanPlayerId,
     props.legalActions,
+    props.pinnedLocationId,
     props.reducedMotion,
     props.selectedDieId,
     ready,
@@ -655,10 +677,12 @@ export function BoardRenderer(props: BoardRendererProps) {
                 placeRef.current(location.id, props.selectedDieId);
                 return;
               }
-              inspectRef.current(location.id);
+              pinRef.current(location.id);
             }}
-            onFocus={() => inspectRef.current(location.id)}
-            onMouseEnter={() => inspectRef.current(location.id)}
+            onBlur={() => hoverRef.current(null)}
+            onFocus={() => hoverRef.current(location.id)}
+            onMouseEnter={() => hoverRef.current(location.id)}
+            onMouseLeave={() => hoverRef.current(null)}
             style={tutorialHotspotStyle(point)}
             title={
               props.selectedDieId

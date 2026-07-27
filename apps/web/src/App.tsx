@@ -208,7 +208,7 @@ function RequirementTokens({
 type CollapsiblePanelId =
   'pressure' | 'quests' | 'cards' | 'forge' | 'preview' | 'log';
 
-type CollapsedPanels = Readonly<Record<CollapsiblePanelId, boolean>>;
+type ActivePanelId = CollapsiblePanelId;
 
 function CollapsiblePanel({
   ariaLabel,
@@ -246,21 +246,155 @@ function CollapsiblePanel({
       <div className="panel-heading collapsible-heading">
         <Heading>{title}</Heading>
         <span className="panel-summary">{summary}</span>
-        <button
-          aria-controls={contentId}
-          aria-expanded={open}
-          className="panel-toggle"
-          onClick={onToggle}
-          type="button"
-        >
-          {open ? 'Collapse' : 'Show'}
-        </button>
+        {!open && (
+          <button
+            aria-controls={contentId}
+            aria-expanded={open}
+            className="panel-toggle"
+            onClick={onToggle}
+            type="button"
+          >
+            Open
+          </button>
+        )}
       </div>
       {open && (
         <div className="collapsible-content" id={contentId}>
           {children}
         </div>
       )}
+    </section>
+  );
+}
+
+function LocationDecisionDock({
+  game,
+  human,
+  inspectedLocation,
+  isPinned,
+  selectedDie,
+  selectedDieId,
+  onClearPin,
+}: {
+  readonly game: GameState;
+  readonly human: PlayerState | undefined;
+  readonly inspectedLocation: GameState['locations'][number] | undefined;
+  readonly isPinned: boolean;
+  readonly selectedDie: PlayerState['dice'][number] | null;
+  readonly selectedDieId: DieId | null;
+  readonly onClearPin: () => void;
+}) {
+  if (!inspectedLocation) {
+    return (
+      <section className="decision-dock" aria-live="polite">
+        <div>
+          <p className="eyebrow">Location decision</p>
+          <h2>Hover or click a region</h2>
+        </div>
+        <p>
+          Pick a die, then use this dock to compare rewards and see exactly why
+          each square is playable or blocked.
+        </p>
+      </section>
+    );
+  }
+
+  const openSlots = inspectedLocation.slots.filter(
+    (slot) => slot.isOpen !== false,
+  );
+  return (
+    <section
+      className={`decision-dock ${isPinned ? 'is-pinned' : ''}`}
+      aria-live="polite"
+      data-tutorial="preview"
+    >
+      <div className="decision-dock-header">
+        <div>
+          <p className="eyebrow">
+            {isPinned ? 'Pinned location' : 'Hovered location'}
+          </p>
+          <h2>{inspectedLocation.name}</h2>
+        </div>
+        {isPinned && (
+          <button type="button" onClick={onClearPin}>
+            Clear pin
+          </button>
+        )}
+      </div>
+      <p>{inspectedLocation.description}</p>
+      <div className="decision-dock-reward">
+        <span>Reward</span>
+        <ResourceList includeVictoryPoints values={inspectedLocation.reward} />
+        <span>
+          {inspectedLocation.isActive === false
+            ? 'Sealed this round'
+            : `${openSlots.length} open slot${openSlots.length === 1 ? '' : 's'}`}
+        </span>
+      </div>
+      <ul className="decision-slot-list">
+        {inspectedLocation.slots.map((slot, index) => {
+          const placement: GameAction | null =
+            selectedDieId && human
+              ? {
+                  type: 'place-die',
+                  playerId: human.id,
+                  dieId: selectedDieId,
+                  locationId: inspectedLocation.id,
+                  slotId: slot.id,
+                }
+              : null;
+          let validation = placement ? validateAction(game, placement) : null;
+          let isBump = false;
+          if (
+            validation &&
+            !validation.legal &&
+            selectedDieId &&
+            human &&
+            slot.occupantDieId !== null &&
+            slot.occupantPlayerId !== human.id
+          ) {
+            const bump = validateAction(game, {
+              type: 'bump-die',
+              playerId: human.id,
+              dieId: selectedDieId,
+              locationId: inspectedLocation.id,
+              slotId: slot.id,
+            });
+            if (bump.legal) {
+              validation = bump;
+              isBump = true;
+            }
+          }
+          const status = !selectedDie
+            ? 'Inspect'
+            : validation?.legal
+              ? isBump
+                ? 'Bump'
+                : 'Playable'
+              : 'Blocked';
+          return (
+            <li
+              className={`decision-slot ${status.toLowerCase()}`}
+              key={slot.id}
+            >
+              <strong>{index + 1}</strong>
+              <span className="decision-slot-main">
+                <RequirementTokens requirement={slot.requirement} />
+                <b>{status}</b>
+              </span>
+              <em>
+                {!selectedDie
+                  ? 'Select a die to test this square.'
+                  : validation?.legal
+                    ? isBump
+                      ? 'Can bump the rival die here.'
+                      : 'This die can be placed here.'
+                    : (validation?.message ?? 'No legal placement here.')}
+              </em>
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }
@@ -278,20 +412,17 @@ export function App() {
   const [upgradeFaceIndex, setUpgradeFaceIndex] = useState(0);
   const [log, setLog] = useState<readonly string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [inspectedLocationId, setInspectedLocationId] =
-    useState<LocationId | null>(null);
+  const [hoveredLocationId, setHoveredLocationId] = useState<LocationId | null>(
+    null,
+  );
+  const [pinnedLocationId, setPinnedLocationId] = useState<LocationId | null>(
+    null,
+  );
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialCompleted, setTutorialCompleted] = useState(
     () => localStorage.getItem(TUTORIAL_KEY) === 'true',
   );
-  const [collapsedPanels, setCollapsedPanels] = useState<CollapsedPanels>({
-    pressure: true,
-    quests: true,
-    cards: false,
-    forge: false,
-    preview: false,
-    log: true,
-  });
+  const [activePanel, setActivePanel] = useState<ActivePanelId>('cards');
   const reducedMotion = useInterfaceStore((state) => state.reducedMotion);
   const toggleReducedMotion = useInterfaceStore(
     (state) => state.toggleReducedMotion,
@@ -305,6 +436,7 @@ export function App() {
     () => (game ? enumerateLegalActions(game) : []),
     [game],
   );
+  const inspectedLocationId = pinnedLocationId ?? hoveredLocationId;
   const inspectedLocation = game?.locations.find(
     (location) => location.id === inspectedLocationId,
   );
@@ -318,23 +450,18 @@ export function App() {
         action.dieId === selectedDieId,
     );
   }, [game, legalActions, selectedDieId]);
-  const inspectLocation = (locationId: LocationId | null) => {
-    setInspectedLocationId(locationId);
-    if (locationId)
-      setCollapsedPanels((current) => ({ ...current, preview: false }));
+  const hoverLocation = (locationId: LocationId | null) => {
+    setHoveredLocationId(locationId);
+  };
+  const pinLocation = (locationId: LocationId | null) => {
+    setPinnedLocationId(locationId);
+    if (locationId) setActivePanel('preview');
   };
   const selectDieForPlanning = (dieId: DieId) => {
     setSelectedDieId(dieId);
-    if (inspectedLocationId)
-      setCollapsedPanels((current) => ({ ...current, preview: false }));
+    if (inspectedLocationId) setActivePanel('preview');
   };
-  const togglePanel = (panel: CollapsiblePanelId) =>
-    setCollapsedPanels((current) => ({
-      ...current,
-      [panel]: !current[panel],
-    }));
-  const showPanel = (panel: CollapsiblePanelId) =>
-    setCollapsedPanels((current) => ({ ...current, [panel]: false }));
+  const showPanel = (panel: ActivePanelId) => setActivePanel(panel);
   const pressure = useMemo(() => {
     if (!game || !human) return null;
     const openLocations = game.locations.filter(
@@ -475,6 +602,13 @@ export function App() {
     );
     if (legal) {
       submitHumanAction(legal);
+      if (
+        legal.type === 'place-die' &&
+        location.tags.includes('forge') &&
+        human.id === legal.playerId
+      ) {
+        setActivePanel('forge');
+      }
       return;
     }
     const rejection = candidates
@@ -726,12 +860,25 @@ export function App() {
                 game={game}
                 humanPlayerId={human.id}
                 legalActions={legalActions}
-                onInspectLocation={inspectLocation}
+                onHoverLocation={hoverLocation}
+                onPinLocation={pinLocation}
                 onPlaceAtLocation={placeAtLocation}
+                pinnedLocationId={pinnedLocationId}
                 reducedMotion={reducedMotion}
                 selectedDieId={selectedDieId}
               />
             )}
+            <LocationDecisionDock
+              game={game}
+              human={human}
+              inspectedLocation={inspectedLocation}
+              isPinned={Boolean(
+                inspectedLocation && inspectedLocation.id === pinnedLocationId,
+              )}
+              onClearPin={() => pinLocation(null)}
+              selectedDie={selectedDie}
+              selectedDieId={selectedDieId}
+            />
             <div className="board-caption">
               <span>
                 {
@@ -829,21 +976,21 @@ export function App() {
                 <div className="panel-shortcuts" aria-label="Open info panels">
                   <button
                     className={
-                      collapsedPanels.preview
-                        ? 'panel-shortcut'
-                        : 'panel-shortcut is-open'
+                      activePanel === 'preview'
+                        ? 'panel-shortcut is-open'
+                        : 'panel-shortcut'
                     }
                     disabled={!inspectedLocation}
                     onClick={() => showPanel('preview')}
                     type="button"
                   >
-                    Preview
+                    Location
                   </button>
                   <button
                     className={
-                      collapsedPanels.cards
-                        ? 'panel-shortcut'
-                        : 'panel-shortcut is-open'
+                      activePanel === 'cards'
+                        ? 'panel-shortcut is-open'
+                        : 'panel-shortcut'
                     }
                     onClick={() => showPanel('cards')}
                     type="button"
@@ -852,9 +999,9 @@ export function App() {
                   </button>
                   <button
                     className={
-                      collapsedPanels.quests
-                        ? 'panel-shortcut'
-                        : 'panel-shortcut is-open'
+                      activePanel === 'quests'
+                        ? 'panel-shortcut is-open'
+                        : 'panel-shortcut'
                     }
                     onClick={() => showPanel('quests')}
                     type="button"
@@ -863,9 +1010,9 @@ export function App() {
                   </button>
                   <button
                     className={
-                      collapsedPanels.forge
-                        ? 'panel-shortcut'
-                        : 'panel-shortcut is-open'
+                      activePanel === 'forge'
+                        ? 'panel-shortcut is-open'
+                        : 'panel-shortcut'
                     }
                     disabled={!forgeUnlocked}
                     onClick={() => showPanel('forge')}
@@ -875,14 +1022,25 @@ export function App() {
                   </button>
                   <button
                     className={
-                      collapsedPanels.log
-                        ? 'panel-shortcut'
-                        : 'panel-shortcut is-open'
+                      activePanel === 'log'
+                        ? 'panel-shortcut is-open'
+                        : 'panel-shortcut'
                     }
                     onClick={() => showPanel('log')}
                     type="button"
                   >
                     Log
+                  </button>
+                  <button
+                    className={
+                      activePanel === 'pressure'
+                        ? 'panel-shortcut is-open'
+                        : 'panel-shortcut'
+                    }
+                    onClick={() => showPanel('pressure')}
+                    type="button"
+                  >
+                    Pressure
                   </button>
                 </div>
                 <button
@@ -911,7 +1069,7 @@ export function App() {
                   ariaLabel="Round pressure"
                   className="pressure-panel"
                   contentId="round-pressure-panel"
-                  open={!collapsedPanels.pressure}
+                  open={activePanel === 'pressure'}
                   summary={
                     <>
                       {pressure.remainingSlots}/{pressure.totalOpenSlots} slots
@@ -919,7 +1077,7 @@ export function App() {
                     </>
                   }
                   title="Round pressure"
-                  onToggle={() => togglePanel('pressure')}
+                  onToggle={() => showPanel('pressure')}
                 >
                   <div className="pressure-grid">
                     <span>
@@ -952,7 +1110,7 @@ export function App() {
                   className="quest-panel"
                   contentId="crown-quests-panel"
                   dataTutorial="quests"
-                  open={!collapsedPanels.quests}
+                  open={activePanel === 'quests'}
                   summary={
                     <>
                       {
@@ -964,7 +1122,7 @@ export function App() {
                     </>
                   }
                   title="Crown Quests"
-                  onToggle={() => togglePanel('quests')}
+                  onToggle={() => showPanel('quests')}
                 >
                   <ul className="quest-list">
                     {game.objectives.map((objective) => {
@@ -1008,10 +1166,10 @@ export function App() {
                 aria-label="Card hand and market"
                 contentId="cards-market-panel"
                 dataTutorial="cards"
-                open={!collapsedPanels.cards}
+                open={activePanel === 'cards'}
                 summary={`${human?.hand.length ?? 0} hand · ${game.cardDeck.length} deck`}
                 title="Cards and market"
-                onToggle={() => togglePanel('cards')}
+                onToggle={() => showPanel('cards')}
               >
                 <div className="panel-heading">
                   <h3>Your hand</h3>
@@ -1109,10 +1267,10 @@ export function App() {
                   ariaLabel="Forge upgrades"
                   className="forge-panel"
                   contentId="forge-upgrades-panel"
-                  open={!collapsedPanels.forge}
+                  open={activePanel === 'forge'}
                   summary="Permanent upgrades"
                   title="Forge Hall"
-                  onToggle={() => togglePanel('forge')}
+                  onToggle={() => showPanel('forge')}
                 >
                   <div className="forge-controls">
                     <label>
@@ -1206,14 +1364,14 @@ export function App() {
                 ariaLive="polite"
                 contentId="location-preview-panel"
                 dataTutorial="preview"
-                open={!collapsedPanels.preview}
+                open={activePanel === 'preview'}
                 summary={
                   inspectedLocation
                     ? inspectedLocation.name
                     : 'Hover or click a location'
                 }
                 title="Location preview"
-                onToggle={() => togglePanel('preview')}
+                onToggle={() => showPanel('preview')}
               >
                 {inspectedLocation ? (
                   <>
@@ -1501,11 +1659,11 @@ export function App() {
               className="log-panel"
               contentId="match-log-panel"
               dataTutorial="log"
-              open={!collapsedPanels.log}
+              open={activePanel === 'log'}
               summary={`${log.length} entries`}
               title="Match log"
               titleLevel={2}
-              onToggle={() => togglePanel('log')}
+              onToggle={() => showPanel('log')}
             >
               <ol>
                 {log.map((entry, index) => (
