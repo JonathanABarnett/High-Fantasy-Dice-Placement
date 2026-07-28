@@ -61,10 +61,10 @@ import relicCardArt from '../../../assets/generated/cards/category-relic-v1.webp
 import tacticCardArt from '../../../assets/generated/cards/category-tactic-v1.webp';
 import elderDragonArt from '../../../assets/generated/encounters/elder-dragon-v1.webp';
 import monsterHuntArt from '../../../assets/generated/encounters/monster-hunt-v1.webp';
-import arcanumPortrait from '../../../assets/generated/factions/arcanum-conclave-v1.png';
-import emberPortrait from '../../../assets/generated/factions/ember-dominion-v1.png';
-import stoneboundPortrait from '../../../assets/generated/factions/stonebound-league-v1.png';
-import verdantPortrait from '../../../assets/generated/factions/verdant-covenant-v1.png';
+import arcanumPortrait from '../../../assets/generated/factions/arcanum-conclave-v1.webp';
+import emberPortrait from '../../../assets/generated/factions/ember-dominion-v1.webp';
+import stoneboundPortrait from '../../../assets/generated/factions/stonebound-league-v1.webp';
+import verdantPortrait from '../../../assets/generated/factions/verdant-covenant-v1.webp';
 import titleHeroArt from '../../../assets/generated/setup/title-hero-v1.webp';
 import cardMarketArt from '../../../assets/generated/ui/card-market-v1.webp';
 import forgeUpgradeArt from '../../../assets/generated/ui/forge-upgrade-v1.webp';

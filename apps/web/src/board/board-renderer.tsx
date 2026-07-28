@@ -19,7 +19,7 @@ import {
   type Texture,
 } from 'pixi.js';
 
-import boardMapUrl from '../../../../assets/generated/board/shattered-realms-map-v1.png';
+import boardMapUrl from '../../../../assets/generated/board/shattered-realms-map-v1.webp';
 
 const BOARD_WIDTH = 1200;
 const BOARD_HEIGHT = 760;
