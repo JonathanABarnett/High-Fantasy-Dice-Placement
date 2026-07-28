@@ -996,58 +996,80 @@ function cappedAmount(amount: number, maxAmount?: number): number {
   return Math.max(0, Math.min(maxAmount ?? amount, amount));
 }
 
+/**
+ * The score breakdown for one player from the current state. Exported so the
+ * interface can show a live standing mid-match: the winning condition is not
+ * victory-point tokens alone, so showing only those would tell the player the
+ * wrong story about who is ahead.
+ */
+export function scorePlayer(
+  state: GameState,
+  playerId: PlayerId,
+): readonly ScoreBreakdown[] {
+  const player = state.players.find((item) => item.id === playerId);
+  if (!player) return [];
+  const resourceTotal = RESOURCE_TYPES.reduce(
+    (total, resource) => total + player.resources[resource],
+    0,
+  );
+  let factionPoints = 0;
+  if (player.factionAbilityId === 'arcane-resonance')
+    factionPoints = Math.floor(player.resources.mana / 2);
+  if (player.factionAbilityId === 'martial-glory')
+    factionPoints = Math.floor((player.placementCounts.martial ?? 0) / 2);
+  if (player.factionAbilityId === 'verdant-adaptation') {
+    // Breadth, not depth: score each resource type held in real quantity.
+    // Counting types that are merely non-zero capped this at 1 point, which
+    // made the faction's scoring rule a trap next to the other three.
+    factionPoints = RESOURCE_TYPES.filter(
+      (resource) => player.resources[resource] >= 3,
+    ).length;
+  }
+  if (player.factionAbilityId === 'stonebound-craft') {
+    // Stonebound already convert materials into forged faces, which score on
+    // their own and now also drive critical strikes, so hoarding pays slower.
+    factionPoints = Math.floor(player.resources.materials / 5);
+  }
+  const cardPoints = player.playedCards.reduce((total, cardId) => {
+    const card = state.cards.find((item) => item.id === cardId);
+    return total + (card && card.category !== 'tactic' ? 1 : 0);
+  }, 0);
+  const upgradePoints = player.dice.reduce(
+    (total, die) =>
+      total +
+      die.enhancements.reduce(
+        (dieTotal, upgradeId) =>
+          dieTotal +
+          (state.upgrades.find((item) => item.id === upgradeId)?.scoreValue ??
+            0),
+        0,
+      ),
+    0,
+  );
+  return [
+    { source: 'Victory-point tokens', points: player.victoryPoints },
+    {
+      source: 'Resource reserves',
+      points: Math.min(3, Math.floor(resourceTotal / 5)),
+    },
+    { source: 'Faction scoring', points: factionPoints },
+    { source: 'Allies and relics', points: cardPoints },
+    { source: 'Die enhancements', points: upgradePoints },
+  ];
+}
+
+/** Total of a player's score breakdown at the current moment. */
+export function scoreTotal(state: GameState, playerId: PlayerId): number {
+  return scorePlayer(state, playerId).reduce(
+    (total, item) => total + item.points,
+    0,
+  );
+}
+
 function scoreMatch(state: GameState): MatchResult {
   const scores = {} as Record<PlayerId, readonly ScoreBreakdown[]>;
-  for (const player of state.players) {
-    const resourceTotal = RESOURCE_TYPES.reduce(
-      (total, resource) => total + player.resources[resource],
-      0,
-    );
-    let factionPoints = 0;
-    if (player.factionAbilityId === 'arcane-resonance')
-      factionPoints = Math.floor(player.resources.mana / 2);
-    if (player.factionAbilityId === 'martial-glory')
-      factionPoints = Math.floor((player.placementCounts.martial ?? 0) / 2);
-    if (player.factionAbilityId === 'verdant-adaptation') {
-      // Breadth, not depth: score each resource type held in real quantity.
-      // Counting types that are merely non-zero capped this at 1 point, which
-      // made the faction's scoring rule a trap next to the other three.
-      factionPoints = RESOURCE_TYPES.filter(
-        (resource) => player.resources[resource] >= 3,
-      ).length;
-    }
-    if (player.factionAbilityId === 'stonebound-craft') {
-      // Stonebound already convert materials into forged faces, which score on
-      // their own and now also drive critical strikes, so hoarding pays slower.
-      factionPoints = Math.floor(player.resources.materials / 5);
-    }
-    const cardPoints = player.playedCards.reduce((total, cardId) => {
-      const card = state.cards.find((item) => item.id === cardId);
-      return total + (card && card.category !== 'tactic' ? 1 : 0);
-    }, 0);
-    const upgradePoints = player.dice.reduce(
-      (total, die) =>
-        total +
-        die.enhancements.reduce(
-          (dieTotal, upgradeId) =>
-            dieTotal +
-            (state.upgrades.find((item) => item.id === upgradeId)?.scoreValue ??
-              0),
-          0,
-        ),
-      0,
-    );
-    scores[player.id] = [
-      { source: 'Victory-point tokens', points: player.victoryPoints },
-      {
-        source: 'Resource reserves',
-        points: Math.min(3, Math.floor(resourceTotal / 5)),
-      },
-      { source: 'Faction scoring', points: factionPoints },
-      { source: 'Allies and relics', points: cardPoints },
-      { source: 'Die enhancements', points: upgradePoints },
-    ];
-  }
+  for (const player of state.players)
+    scores[player.id] = scorePlayer(state, player.id);
   const totals = state.players.map((player) => ({
     id: player.id,
     score: (scores[player.id] ?? []).reduce(

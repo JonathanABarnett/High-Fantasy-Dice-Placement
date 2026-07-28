@@ -10,9 +10,10 @@ Milestone 2 presents the deterministic placement, faction passive, resource, rou
 
 1. **Every die creates a decision.** Values and affinities should open competing opportunities, not predetermine a turn. Monster hunts at the combat locations make raw value matter as a magnitude — a high roll loots more and can land a critical strike — so a six is a genuinely different choice from a five, not just another die that clears the gate.
 2. **Growth is visible and personal.** Face upgrades, cards, and faction abilities should create a distinctive engine over six rounds.
-3. **Competition stays legible.** Scarce locations and denial matter, while previews clearly explain legal actions, costs, and rewards. Bumping makes denial an explicit, priced move; the shared raid pool and first-come crown quests make rivals' progress something you must watch and race, not just observe.
-4. **Chance can be managed.** Rerolls, conversion, upgrades, and low-value strategies prevent a poor roll from becoming a non-turn.
-5. **Asymmetry changes priorities.** Factions share core rules but value actions differently.
+3. **The screen has a hierarchy.** The loudest thing is the live standing, because "am I winning?" is the question a player asks constantly. It is computed with the real scoring rules rather than victory-point tokens alone, since tokens are only one of five sources and would tell the wrong story. Resources are inputs rather than goals, so they render as icon and count with their explanations on hover. Sidebar tabs carry a dot only when a turn can actually be spent behind them.
+4. **Competition stays legible.** Scarce locations and denial matter, while previews clearly explain legal actions, costs, and rewards. Bumping makes denial an explicit, priced move; the shared raid pool and first-come crown quests make rivals' progress something you must watch and race, not just observe.
+5. **Chance can be managed.** Rerolls, conversion, upgrades, and low-value strategies prevent a poor roll from becoming a non-turn.
+6. **Asymmetry changes priorities.** Factions share core rules but value actions differently.
 
 ## Planned factions
 

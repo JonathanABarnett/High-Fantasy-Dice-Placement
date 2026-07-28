@@ -28,6 +28,7 @@ import {
   extendChain,
   raidBountyFor,
   raidDamageFor,
+  scoreTotal,
   serializeGame,
   validateAction,
 } from '@shattered-crown/game-engine';
@@ -35,6 +36,7 @@ import type {
   CardCategory,
   DieId,
   FactionId,
+  PlayerId,
   GameAction,
   GameEvent,
   GameState,
@@ -331,6 +333,36 @@ function RequirementTokens({
     </span>
   );
 }
+
+/**
+ * Sidebar tabs, with a predicate for whether a turn can still be spent there.
+ * Keeping this as data means the five buttons stay identical in behaviour and
+ * the "where should I look?" signal is defined in one place.
+ */
+const PANEL_SHORTCUTS: readonly {
+  readonly id: CollapsiblePanelId;
+  readonly label: string;
+  readonly hasAction: (actions: readonly GameAction[]) => boolean;
+}[] = [
+  {
+    id: 'cards',
+    label: 'Cards',
+    hasAction: (actions) =>
+      actions.some(
+        (action) =>
+          action.type === 'play-card' || action.type === 'acquire-card',
+      ),
+  },
+  { id: 'quests', label: 'Quests', hasAction: () => false },
+  {
+    id: 'forge',
+    label: 'Forge',
+    hasAction: (actions) =>
+      actions.some((action) => action.type === 'upgrade-die'),
+  },
+  { id: 'log', label: 'Log', hasAction: () => false },
+  { id: 'pressure', label: 'Pressure', hasAction: () => false },
+];
 
 type CollapsiblePanelId = 'pressure' | 'quests' | 'cards' | 'forge' | 'log';
 
@@ -707,6 +739,22 @@ export function App() {
     () => (game ? enumerateLegalActions(game) : []),
     [game],
   );
+  /** Who is ahead on the real scoring rules, and by how much. */
+  const leader = useMemo(() => {
+    if (!game) return { id: null as PlayerId | null, margin: 0 };
+    const totals = game.players.map((player) => ({
+      id: player.id,
+      score: scoreTotal(game, player.id),
+    }));
+    const sorted = [...totals].sort((left, right) => right.score - left.score);
+    const top = sorted[0];
+    const chaser = sorted[1];
+    if (!top) return { id: null as PlayerId | null, margin: 0 };
+    return {
+      id: top.id,
+      margin: top.score - (chaser?.score ?? top.score),
+    };
+  }, [game]);
   const inspectedLocationId = pinnedLocationId ?? hoveredLocationId;
   const inspectedLocation = game?.locations.find(
     (location) => location.id === inspectedLocationId,
@@ -1084,7 +1132,7 @@ export function App() {
               className="faction-portrait"
               src={FACTION_PORTRAITS[player.factionId]}
             />
-            <div>
+            <div className="player-identity">
               <strong>{player.name}</strong>
               <span>
                 {
@@ -1092,21 +1140,32 @@ export function App() {
                     ?.name
                 }
               </span>
+              {/* Resources are inputs, not goals: icon and count only, with
+                  the full explanation still on hover and for screen readers. */}
+              <div className="resources">
+                {(Object.keys(player.resources) as ResourceType[]).map(
+                  (resource) => (
+                    <ResourceToken
+                      compact
+                      key={resource}
+                      resource={resource}
+                      value={player.resources[resource]}
+                    />
+                  ),
+                )}
+              </div>
             </div>
-            <div className="resources">
-              {(Object.keys(player.resources) as ResourceType[]).map(
-                (resource) => (
-                  <ResourceToken
-                    key={resource}
-                    resource={resource}
-                    value={player.resources[resource]}
-                  />
-                ),
-              )}
-              <ResourceToken
-                resource="victoryPoints"
-                value={player.victoryPoints}
-              />
+            {/* The standing is the loudest thing on screen, because "am I
+                winning?" is the question the old layout could not answer. */}
+            <div className="player-score">
+              <strong>{scoreTotal(game, player.id)}</strong>
+              <span>
+                {leader.margin === 0
+                  ? 'level'
+                  : leader.id === player.id
+                    ? `ahead by ${leader.margin}`
+                    : `behind by ${leader.margin}`}
+              </span>
             </div>
           </article>
         ))}
@@ -1276,62 +1335,34 @@ export function App() {
                   </div>
                 )}
                 <div className="panel-shortcuts" aria-label="Open info panels">
-                  <button
-                    className={
-                      activePanel === 'cards'
-                        ? 'panel-shortcut is-open'
-                        : 'panel-shortcut'
-                    }
-                    onClick={() => showPanel('cards')}
-                    type="button"
-                  >
-                    Cards
-                  </button>
-                  <button
-                    className={
-                      activePanel === 'quests'
-                        ? 'panel-shortcut is-open'
-                        : 'panel-shortcut'
-                    }
-                    onClick={() => showPanel('quests')}
-                    type="button"
-                  >
-                    Quests
-                  </button>
-                  <button
-                    className={
-                      activePanel === 'forge'
-                        ? 'panel-shortcut is-open'
-                        : 'panel-shortcut'
-                    }
-                    disabled={!forgeUnlocked}
-                    onClick={() => showPanel('forge')}
-                    type="button"
-                  >
-                    Forge
-                  </button>
-                  <button
-                    className={
-                      activePanel === 'log'
-                        ? 'panel-shortcut is-open'
-                        : 'panel-shortcut'
-                    }
-                    onClick={() => showPanel('log')}
-                    type="button"
-                  >
-                    Log
-                  </button>
-                  <button
-                    className={
-                      activePanel === 'pressure'
-                        ? 'panel-shortcut is-open'
-                        : 'panel-shortcut'
-                    }
-                    onClick={() => showPanel('pressure')}
-                    type="button"
-                  >
-                    Pressure
-                  </button>
+                  {PANEL_SHORTCUTS.map((shortcut) => {
+                    // A dot means there is an action waiting behind that tab,
+                    // so the player does not have to open all five to find out
+                    // where their turn can actually be spent.
+                    const waiting =
+                      activePlayer?.controller === 'human' &&
+                      shortcut.hasAction(legalActions);
+                    return (
+                      <button
+                        className={[
+                          'panel-shortcut',
+                          activePanel === shortcut.id ? 'is-open' : '',
+                          waiting ? 'has-action' : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                        disabled={shortcut.id === 'forge' && !forgeUnlocked}
+                        key={shortcut.id}
+                        onClick={() => showPanel(shortcut.id)}
+                        type="button"
+                      >
+                        {shortcut.label}
+                        {waiting && (
+                          <i aria-label="action available" className="dot" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
                 <button
                   className="pass"

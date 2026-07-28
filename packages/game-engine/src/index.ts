@@ -11,6 +11,8 @@ export {
   enumerateLegalActions,
   raidBountyFor,
   raidDamageFor,
+  scorePlayer,
+  scoreTotal,
   serializeGame,
   validateAction,
 } from './match.js';

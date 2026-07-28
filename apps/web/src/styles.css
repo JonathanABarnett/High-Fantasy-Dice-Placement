@@ -1743,3 +1743,68 @@ select {
     animation: none;
   }
 }
+
+/* Information hierarchy: standing is loud, resources are quiet. */
+.player-identity {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1;
+}
+.player-identity > .resources {
+  justify-content: flex-start;
+  margin-top: 0.25rem;
+  gap: 0.22rem;
+}
+.player-identity > .resources .info-token {
+  padding: 0.12rem 0.3rem;
+  background: transparent;
+  border-color: transparent;
+}
+.player-identity > .resources .info-token strong {
+  color: #c8b89e;
+}
+.player-score {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 0;
+  padding-left: 0.9rem;
+  border-left: 1px solid #3f362c;
+  text-align: right;
+}
+.player-score > strong {
+  color: #ffd88a;
+  font-family: Georgia, serif;
+  font-size: 2.4rem;
+  line-height: 1;
+  text-shadow: 0 0 1.6rem rgb(255 190 80 / 30%);
+}
+.player-score > span {
+  color: #8d8171;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.player.active .player-score > strong {
+  color: #ffe6ad;
+}
+
+/* A tab with a waiting action earns a dot; everything else stays quiet. */
+.panel-shortcut {
+  position: relative;
+}
+.panel-shortcut .dot {
+  position: absolute;
+  top: 0.22rem;
+  right: 0.28rem;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: #ffc65e;
+  box-shadow: 0 0 0.4rem rgb(255 198 94 / 80%);
+}
+.panel-shortcut.has-action {
+  border-color: #9a7433;
+  color: #ffdda4;
+}
