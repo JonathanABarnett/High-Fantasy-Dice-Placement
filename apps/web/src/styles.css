@@ -830,6 +830,30 @@ select {
 .forge-panel {
   order: 8;
 }
+.quest-panel,
+.forge-panel {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgb(23 20 16 / 96%) 0 58%, rgb(23 20 16 / 76%)),
+    var(--panel-art, none) right center / auto 100% no-repeat,
+    #171410;
+}
+.quest-panel > *,
+.forge-panel > * {
+  position: relative;
+  z-index: 1;
+}
+.quest-panel::before,
+.forge-panel::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: '';
+  background:
+    radial-gradient(circle at 82% 34%, rgb(231 184 84 / 18%), transparent 34%),
+    linear-gradient(90deg, transparent 0 64%, rgb(0 0 0 / 38%));
+}
 .pressure-panel,
 .location-preview,
 .quest-panel,
@@ -1541,20 +1565,40 @@ select {
 
 /* Encounter strip: makes a location's monster read as a monster. */
 .encounter-strip {
+  position: relative;
+  overflow: hidden;
   margin: 0.55rem 0;
   padding: 0.55rem 0.65rem;
   border: 1px solid #8a4130;
   border-left-width: 4px;
   border-radius: 0.45rem;
-  background: linear-gradient(180deg, rgb(87 26 22 / 55%), rgb(40 20 16 / 40%));
+  background:
+    linear-gradient(90deg, rgb(40 20 16 / 96%) 0 62%, rgb(40 20 16 / 72%)),
+    var(--encounter-art, none) right center / auto 100% no-repeat,
+    linear-gradient(180deg, rgb(87 26 22 / 55%), rgb(40 20 16 / 40%));
+  box-shadow: inset 0 0 0 1px rgb(255 218 142 / 7%);
 }
 .encounter-strip.slain {
   border-color: #6a625a;
   background: rgb(38 35 31 / 60%);
 }
+.encounter-strip::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: '';
+  background:
+    radial-gradient(circle at 85% 48%, rgb(255 178 85 / 18%), transparent 34%),
+    linear-gradient(90deg, transparent 0 67%, rgb(0 0 0 / 46%));
+}
 .encounter-strip.lethal {
   border-color: #ffd24a;
   box-shadow: 0 0 0 1px rgb(255 210 74 / 40%);
+}
+.encounter-strip > * {
+  position: relative;
+  z-index: 1;
+  max-width: 73%;
 }
 .encounter-title {
   display: flex;

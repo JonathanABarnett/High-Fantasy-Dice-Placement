@@ -31,6 +31,28 @@ replace them later.
 - `cards/category-relic-v1.webp`: luminous ancient crown-shard/amulet hovering
   above a stone pedestal amid crystal magic.
 
+## Encounter art
+
+Reusable square encounter illustrations that are code-cropped into location
+detail strips. These add immediate monster/raid readability without baking rules
+or labels into the art.
+
+- `encounters/elder-dragon-v1.webp`: ancient horned Elder Dragon in a storm-dark
+  mountain pass, sapphire-black scales with ember cracks, moonlight and hoard
+  glow.
+- `encounters/monster-hunt-v1.webp`: hulking wolf-lion-drake beast in a moonlit,
+  vine-choked ruined stronghold, with green eye glow and mist.
+
+## UI panel art
+
+Reusable square ambience art for collapsible information panels. These are used
+as subtle right-side background art behind code-rendered text and controls.
+
+- `ui/forge-upgrade-v1.webp`: ancient dwarven forge hall with magical hammers,
+  molten channels, and a glowing enchanted die being reforged.
+- `ui/shattered-crown-quest-v1.webp`: broken golden crown fragments suspended
+  above parchment maps, candlelight, and violet-blue magic.
+
 ## Shared generation constraints
 
 Original character, environment, and artifact designs; premium fantasy board-game atmosphere; readable at browser-game scale; no protected characters or settings; no text, letters, numbers, logos, dice, card frames, UI frames, or watermarks baked into generated art; no rules or labels baked into the map or card artwork.

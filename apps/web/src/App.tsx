@@ -59,10 +59,14 @@ import { TutorialOverlay } from './tutorial/TutorialOverlay';
 import allyCardArt from '../../../assets/generated/cards/category-ally-v1.webp';
 import relicCardArt from '../../../assets/generated/cards/category-relic-v1.webp';
 import tacticCardArt from '../../../assets/generated/cards/category-tactic-v1.webp';
+import elderDragonArt from '../../../assets/generated/encounters/elder-dragon-v1.webp';
+import monsterHuntArt from '../../../assets/generated/encounters/monster-hunt-v1.webp';
 import arcanumPortrait from '../../../assets/generated/factions/arcanum-conclave-v1.png';
 import emberPortrait from '../../../assets/generated/factions/ember-dominion-v1.png';
 import stoneboundPortrait from '../../../assets/generated/factions/stonebound-league-v1.png';
 import verdantPortrait from '../../../assets/generated/factions/verdant-covenant-v1.png';
+import forgeUpgradeArt from '../../../assets/generated/ui/forge-upgrade-v1.webp';
+import shatteredCrownQuestArt from '../../../assets/generated/ui/shattered-crown-quest-v1.webp';
 
 const SAVE_KEY = 'shattered-crown.debug-match.v4';
 const TUTORIAL_KEY = 'shattered-crown.tutorial-complete.v1';
@@ -78,6 +82,10 @@ const CARD_CATEGORY_ART: Readonly<Record<CardCategory, string>> = {
   ally: allyCardArt,
   relic: relicCardArt,
 };
+const ENCOUNTER_ART = {
+  hunt: monsterHuntArt,
+  raid: elderDragonArt,
+} as const;
 
 interface SavedMatchEnvelope {
   readonly envelopeVersion: typeof SAVE_ENVELOPE_VERSION;
@@ -117,6 +125,18 @@ function parseSavedMatch(serialized: string): {
 function cardArtStyle(category: CardCategory): CSSProperties {
   return {
     '--card-art': `url(${CARD_CATEGORY_ART[category]})`,
+  } as CSSProperties;
+}
+
+function encounterArtStyle(kind: keyof typeof ENCOUNTER_ART): CSSProperties {
+  return {
+    '--encounter-art': `url(${ENCOUNTER_ART[kind]})`,
+  } as CSSProperties;
+}
+
+function panelArtStyle(asset: string): CSSProperties {
+  return {
+    '--panel-art': `url(${asset})`,
   } as CSSProperties;
 }
 
@@ -412,6 +432,7 @@ function CollapsiblePanel({
   contentId,
   dataTutorial,
   open,
+  style,
   summary,
   title,
   titleLevel = 3,
@@ -425,6 +446,7 @@ function CollapsiblePanel({
   readonly dataTutorial?: string;
   readonly open: boolean;
   readonly summary?: ReactNode;
+  readonly style?: CSSProperties;
   readonly title: ReactNode;
   readonly titleLevel?: 2 | 3;
   readonly onToggle: () => void;
@@ -436,6 +458,7 @@ function CollapsiblePanel({
       aria-live={ariaLive}
       className={`${className} collapsible-panel ${open ? 'is-open' : 'is-collapsed'}`}
       data-tutorial={dataTutorial}
+      style={style}
     >
       <div className="panel-heading collapsible-heading">
         <Heading>{title}</Heading>
@@ -482,7 +505,7 @@ function EncounterSummary({
 
   if (encounter.health === undefined) {
     return (
-      <div className="encounter-strip hunt">
+      <div className="encounter-strip hunt" style={encounterArtStyle('hunt')}>
         <div className="encounter-title">
           <strong>⚔ {encounter.beasts.join(' · ')}</strong>
           <span>Monster hunt</span>
@@ -514,7 +537,10 @@ function EncounterSummary({
   const survived = game.raidRoundsSurvived?.[location.id] ?? 0;
   const bounty = raidBountyFor(location, survived);
   return (
-    <div className={`encounter-strip raid ${lethal ? 'lethal' : ''}`}>
+    <div
+      className={`encounter-strip raid ${lethal ? 'lethal' : ''}`}
+      style={encounterArtStyle('raid')}
+    >
       <div className="encounter-title">
         <strong>⚔ {beast}</strong>
         <span>
@@ -1486,6 +1512,7 @@ export function App() {
                       unclaimed
                     </>
                   }
+                  style={panelArtStyle(shatteredCrownQuestArt)}
                   title="Crown Quests"
                   onToggle={() => showPanel('quests')}
                 >
@@ -1634,6 +1661,7 @@ export function App() {
                   contentId="forge-upgrades-panel"
                   open={activePanel === 'forge'}
                   summary="Permanent upgrades"
+                  style={panelArtStyle(forgeUpgradeArt)}
                   title="Forge Hall"
                   onToggle={() => showPanel('forge')}
                 >
