@@ -2,6 +2,7 @@ import type {
   ActionValidation,
   BoardLocation,
   Card,
+  ChainState,
   ClaimableObjective,
   Die,
   DieAffinity,
@@ -58,6 +59,29 @@ const ARCANE_BUMP_COST: Partial<ResourcePool> = { mana: 1 };
 const EMBER_RAID_BONUS = 2;
 /** Extra influence demanded to shift a Stonebound die. */
 const STONEBOUND_BUMP_TAX: Partial<ResourcePool> = { influence: 1 };
+
+/**
+ * Victory points for extending a themed run of placements, by run length.
+ * Short runs pay nothing, so the reward is for committing to a plan across a
+ * whole round rather than for two placements that happen to rhyme.
+ */
+export function chainBonusFor(length: number): number {
+  if (length >= 5) return 4;
+  if (length === 4) return 3;
+  if (length === 3) return 2;
+  return 0;
+}
+
+/** The run a placement at these tags would produce, given the current run. */
+export function extendChain(
+  chain: ChainState | undefined,
+  tags: readonly string[],
+): ChainState {
+  const continues = Boolean(
+    chain?.length && tags.some((tag) => chain.tags.includes(tag)),
+  );
+  return { tags, length: continues ? (chain?.length ?? 0) + 1 : 1 };
+}
 
 /**
  * What the attacker pays, on top of any slot cost, to bump the defender.
@@ -1050,6 +1074,8 @@ function finishOrStartRound(state: GameState): TransitionResult {
   const resetPlayers = state.players.map((player) => ({
     ...player,
     hasPassed: false,
+    // Each round is its own run: last round's theme does not carry over.
+    chain: { tags: [], length: 0 },
   }));
   const roundLocations = configureRoundScarcity(
     state.locations,
@@ -1534,6 +1560,12 @@ export function applyAction(
     }
     const slewMonster = slainBeast !== null;
 
+    // A themed run of placements pays out as it lengthens, so the order dice
+    // are committed in matters as much as which slots they land on.
+    const chain = extendChain(actingPlayer.chain, location.tags);
+    const chainBonus = chainBonusFor(chain.length);
+    bonusPoints += chainBonus;
+
     reward = {
       ...reward,
       ...Object.fromEntries(
@@ -1562,6 +1594,7 @@ export function applyAction(
             bonusPoints,
           placementCounts,
           monstersSlain: player.monstersSlain + (slewMonster ? 1 : 0),
+          chain,
           dice: player.dice.map((item) =>
             item.id === action.dieId
               ? { ...item, status: 'placed' as const }
@@ -1635,6 +1668,17 @@ export function applyAction(
         overkill,
         critical,
         bonusVictoryPoints: (location.reward.victoryPoints ?? 0) + bonusPoints,
+      });
+    }
+    if (chain.length >= 2) {
+      sequence += 1;
+      events.push({
+        type: 'chain-extended',
+        sequence,
+        playerId: action.playerId,
+        tag: location.tags[0] ?? '',
+        length: chain.length,
+        bonusVictoryPoints: chainBonus,
       });
     }
     if (raidChip) {

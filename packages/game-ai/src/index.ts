@@ -1,7 +1,9 @@
 import {
   applyAction,
+  chainBonusFor,
   dieValue,
   enumerateLegalActions,
+  extendChain,
   raidDamageFor,
   SeededRandom,
 } from '@shattered-crown/game-engine';
@@ -248,6 +250,14 @@ export function evaluateCpuActions(
         if (critical) score += encounter.criticalBonus * 3;
       }
     }
+    // Keeping a themed run alive is worth real points, and the run that is one
+    // step from paying out is worth more than one just starting.
+    const chain = extendChain(player.chain, location.tags);
+    score += chainBonusFor(chain.length) * 3;
+    // Look one link ahead so the CPU builds toward a run instead of only
+    // taking runs that happen to fall in its lap.
+    score += chainBonusFor(chain.length + 1) * 0.9;
+
     // Bumping denies a rival a held slot, but it costs influence, spends a
     // strong die, and hands the victim their die back. Price it as a deliberate
     // swing rather than a default play, so it stays a memorable moment.

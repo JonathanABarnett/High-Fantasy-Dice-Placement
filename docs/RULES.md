@@ -18,6 +18,12 @@ Selecting a die places the board in route-preview mode. Open locations receive a
 
 Twelve locations are implemented: Crystal Cavern, Mage Tower, Ancient Library, Sacred Shrine, Dwarven Mines, Forge Hall, Goldgate Market, Harbor, Wildwood Grove, Ruined Stronghold, Dragon Pass, and Watchtower. Their data definitions provide distinct resource and victory-point rewards.
 
+## Momentum runs
+
+Placements within a round build a themed run. Placing at a location that shares a tag with your previous placement extends the run; placing anywhere else restarts it at one. A run pays victory points as it lengthens — 2 points at three links, 3 at four, and 4 at five — so the reward is for committing to a theme across a whole round rather than taking the best isolated slot each turn. Runs reset at the start of each round.
+
+This is what makes the order of your placements matter: a slightly worse slot that keeps a run alive is often better than the best slot that breaks it.
+
 ## Monster hunts
 
 Ruined Stronghold is a monster hunt. Each of its two slots is a distinct beast whose minimum value is its threat; placing a die there slays that beast. Unlike other locations, the die's value matters beyond the gate: every point by which the rolled value beats the threat loots one extra material. A natural six or a forged masterwork face lands a critical strike for bonus victory points.

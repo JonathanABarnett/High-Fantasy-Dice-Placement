@@ -68,7 +68,8 @@ test('pins location details and exposes preview icon explanations', async ({
 
   await page.getByRole('button', { name: 'Inspect Crystal Cavern' }).click();
 
-  const preview = page.locator('.location-preview');
+  // The decision dock beneath the board is the canonical location display.
+  const preview = page.locator('.decision-dock');
   await expect(
     preview.getByRole('heading', { name: 'Crystal Cavern' }),
   ).toBeVisible();
@@ -85,10 +86,7 @@ test('pins location details and exposes preview icon explanations', async ({
     /Accepted by magical locations/i,
   );
   await page.locator('.die:not([disabled])').first().click();
-  await expect(preview).toContainText(/PLAYABLE|BLOCKED/);
-  await expect(page.locator('.decision-dock')).toContainText(
-    /Playable|Blocked/,
-  );
+  await expect(preview).toContainText(/Playable|Blocked/);
 });
 
 test('guides a new player through the complete visual tutorial', async ({

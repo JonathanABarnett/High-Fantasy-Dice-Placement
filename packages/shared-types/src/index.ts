@@ -236,6 +236,19 @@ export interface PlayerState {
   readonly hasPassed: boolean;
   readonly placementCounts: Readonly<Record<string, number>>;
   readonly monstersSlain: number;
+  /**
+   * The themed run of placements built this round. Placing at a location that
+   * shares a tag with your previous placement extends the chain; anything else
+   * restarts it. Cleared each round, so it rewards planning a whole round's
+   * sequence rather than taking the best isolated slot each turn.
+   */
+  readonly chain?: ChainState;
+}
+
+export interface ChainState {
+  /** Tags of the most recent placement, matched against to continue the run. */
+  readonly tags: readonly string[];
+  readonly length: number;
 }
 
 export interface RoundState {
@@ -429,6 +442,14 @@ export type GameEvent =
       readonly victimPlayerId: PlayerId;
       readonly resource: ResourceType;
       readonly amount: number;
+    }
+  | {
+      readonly type: 'chain-extended';
+      readonly sequence: number;
+      readonly playerId: PlayerId;
+      readonly tag: string;
+      readonly length: number;
+      readonly bonusVictoryPoints: number;
     };
 
 export interface ScoreBreakdown {

@@ -1538,3 +1538,208 @@ select {
     transition: none;
   }
 }
+
+/* Encounter strip: makes a location's monster read as a monster. */
+.encounter-strip {
+  margin: 0.55rem 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #8a4130;
+  border-left-width: 4px;
+  border-radius: 0.45rem;
+  background: linear-gradient(180deg, rgb(87 26 22 / 55%), rgb(40 20 16 / 40%));
+}
+.encounter-strip.slain {
+  border-color: #6a625a;
+  background: rgb(38 35 31 / 60%);
+}
+.encounter-strip.lethal {
+  border-color: #ffd24a;
+  box-shadow: 0 0 0 1px rgb(255 210 74 / 40%);
+}
+.encounter-title {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.encounter-title strong {
+  color: #ffbe97;
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+}
+.encounter-strip.lethal .encounter-title strong {
+  color: #ffe08a;
+}
+.encounter-title span {
+  color: #d8b7a2;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.encounter-health {
+  height: 0.6rem;
+  margin: 0.45rem 0 0.4rem;
+  overflow: hidden;
+  border: 1px solid #7a4a30;
+  border-radius: 0.3rem;
+  background: #1d1512;
+}
+.encounter-health > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #d6483c, #f08050);
+  transition: width 260ms ease;
+}
+.encounter-strip p {
+  margin: 0;
+  color: #dcc0ae;
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+
+/* Momentum: the themed run being built this round. */
+.momentum {
+  margin-top: 0.55rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid #4a3f2e;
+  border-radius: 0.5rem;
+  background: #171410;
+}
+.momentum.is-hot {
+  border-color: #c07a2e;
+  background: linear-gradient(180deg, rgb(96 54 18 / 45%), #171410);
+}
+.momentum-head {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.momentum-head strong {
+  color: #e8c98a;
+  font-size: 0.76rem;
+  text-transform: capitalize;
+}
+.momentum.is-hot .momentum-head strong {
+  color: #ffc46a;
+}
+.momentum-head span {
+  color: #93866f;
+  font-size: 0.64rem;
+  font-weight: 800;
+}
+.momentum-pips {
+  display: flex;
+  gap: 0.25rem;
+  margin-top: 0.4rem;
+}
+.momentum-pips i {
+  height: 0.35rem;
+  flex: 1;
+  border-radius: 0.2rem;
+  background: #2c2620;
+}
+.momentum-pips i.lit {
+  background: #8a6a3a;
+}
+.momentum-pips i.lit.scoring {
+  background: linear-gradient(90deg, #e8a33c, #ffd071);
+}
+.chain-hint {
+  margin: 0.4rem 0 0 !important;
+  font-size: 0.72rem !important;
+  font-weight: 800;
+}
+.chain-hint.continues {
+  color: #ffc46a !important;
+}
+.chain-hint.breaks {
+  color: #a2917a !important;
+}
+.chain-hint.scores {
+  color: #ffd071 !important;
+}
+
+/* Callout: the one moment in a batch worth interrupting for. */
+.callout {
+  position: absolute;
+  z-index: 40;
+  top: 12%;
+  left: 50%;
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.8rem 1.6rem;
+  border: 2px solid #e0a34a;
+  border-radius: 0.7rem;
+  background: rgb(22 15 11 / 96%);
+  box-shadow: 0 1.4rem 3.5rem rgb(0 0 0 / 70%);
+  pointer-events: none;
+  text-align: center;
+  transform: translate(-50%, 0);
+  animation: callout-pop 2200ms ease-out forwards;
+}
+.callout.still {
+  animation: none;
+}
+.callout strong {
+  color: #ffd071;
+  font-family: Georgia, serif;
+  font-size: 1.5rem;
+  letter-spacing: 0.04em;
+  text-shadow: 0 0 1.4rem rgb(255 175 60 / 55%);
+}
+.callout span {
+  color: #dfccae;
+  font-size: 0.82rem;
+}
+.callout.tone-triumph {
+  border-color: #ffce5e;
+}
+.callout.tone-triumph strong {
+  color: #ffe08a;
+}
+.callout.tone-blow {
+  border-color: #d3653f;
+}
+.callout.tone-blow strong {
+  color: #ff9d6a;
+}
+.callout.tone-quest {
+  border-color: #6fc98d;
+}
+.callout.tone-quest strong {
+  color: #9df0b8;
+}
+.callout.tone-chain {
+  border-color: #e0872e;
+}
+.callout.tone-chain strong {
+  color: #ffbb60;
+}
+@keyframes callout-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0.8rem) scale(0.88);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1.04);
+  }
+  20% {
+    transform: translate(-50%, 0) scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -0.8rem) scale(0.98);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .callout {
+    animation: none;
+  }
+}
