@@ -1412,18 +1412,29 @@ export function App() {
                   const boost = die.valueBonus ?? 0;
                   const value =
                     die.rolledFaceIndex === null ? '—' : dieValue(die);
+                  const rolledFace =
+                    die.rolledFaceIndex === null
+                      ? null
+                      : (die.faces[die.rolledFaceIndex] ?? null);
+                  const symbolSummary = rolledFace?.symbols.length
+                    ? ` Face grants ${rolledFace.symbols.map(symbolLabel).join(' and ')}.`
+                    : '';
+                  const forgedSummary = die.enhancements.length
+                    ? ` ${die.enhancements.length} forged face${die.enhancements.length === 1 ? '' : 's'} installed.`
+                    : '';
                   const classes = [
                     'die',
                     `die-${die.affinity}`,
                     selectedDieId === die.id ? 'selected' : '',
                     boost > 0 ? 'boosted' : '',
+                    die.enhancements.length ? 'forged' : '',
                   ]
                     .filter(Boolean)
                     .join(' ');
                   return (
                     <button
                       className={classes}
-                      data-tooltip={`${affinity.label}: ${affinity.description}`}
+                      data-tooltip={`${affinity.label}: ${affinity.description}${symbolSummary}${forgedSummary}`}
                       disabled={
                         die.status !== 'ready' ||
                         activePlayer?.controller !== 'human'
@@ -1448,6 +1459,26 @@ export function App() {
                       </span>
                       <strong>{value}</strong>
                       {boost > 0 && <span className="die-boost">+{boost}</span>}
+                      {rolledFace?.symbols.length ? (
+                        <span className="die-symbols" aria-hidden="true">
+                          {rolledFace.symbols.map((symbol, index) => (
+                            <span
+                              className={`die-symbol die-symbol-${symbol}`}
+                              key={`${symbol}-${index}`}
+                            >
+                              <GameIcon name={symbolIcon(symbol)} />
+                            </span>
+                          ))}
+                        </span>
+                      ) : null}
+                      {die.enhancements.length ? (
+                        <span
+                          aria-label={`${die.enhancements.length} forged face${die.enhancements.length === 1 ? '' : 's'} installed`}
+                          className="die-forged-badge"
+                        >
+                          {die.enhancements.length}
+                        </span>
+                      ) : null}
                       <span className="die-affinity">{affinity.label}</span>
                     </button>
                   );

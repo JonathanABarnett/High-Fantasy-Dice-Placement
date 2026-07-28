@@ -789,6 +789,65 @@ select {
   background: #5b3c1b;
   transform: translateY(-3px);
 }
+.die.forged {
+  box-shadow:
+    0 0 0 1px rgb(226 178 80 / 34%),
+    0 0 1rem rgb(226 178 80 / 12%),
+    inset 0.16rem 0.16rem 0 rgb(255 255 255 / 7%),
+    inset -0.16rem -0.16rem 0 rgb(0 0 0 / 35%);
+}
+.die-symbols {
+  position: absolute;
+  right: 0.22rem;
+  bottom: 0.22rem;
+  display: flex;
+  gap: 0.06rem;
+}
+.die-symbol {
+  display: inline-grid;
+  width: 0.82rem;
+  aspect-ratio: 1;
+  color: #f1c66f;
+  filter: drop-shadow(0 0 0.25rem rgb(0 0 0 / 80%));
+  place-items: center;
+}
+.die-symbol .game-icon {
+  stroke-width: 2.2;
+}
+.die-symbol-gold {
+  color: #f4be42;
+}
+.die-symbol-mana {
+  color: #56b8ff;
+}
+.die-symbol-knowledge {
+  color: #e9dfc2;
+}
+.die-symbol-materials {
+  color: #d69058;
+}
+.die-symbol-influence {
+  color: #d57af1;
+}
+.die-symbol-masterwork {
+  color: #ffe38a;
+}
+.die-forged-badge {
+  position: absolute;
+  top: -0.28rem;
+  right: -0.28rem;
+  display: grid;
+  width: 1rem;
+  aspect-ratio: 1;
+  border: 1px solid #6e4f1d;
+  border-radius: 999px;
+  color: #2a1a05;
+  background: linear-gradient(180deg, #ffe08a, #c8902e);
+  font-size: 0.58rem;
+  font-weight: 950;
+  place-items: center;
+  box-shadow: 0 0 0.55rem rgb(217 161 65 / 28%);
+}
 .die[draggable='true'] {
   cursor: grab;
 }
