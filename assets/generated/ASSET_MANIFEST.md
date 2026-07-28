@@ -17,6 +17,13 @@ All four portraits use a matching square bust composition, painterly realism, da
 - `factions/verdant-covenant-v1.png`: ancient forest guardian in deep green, warm earth, muted gold, and teal magic.
 - `factions/stonebound-league-v1.png`: dwarven master engineer and smith in charcoal steel, leather, brass, amber, and forge light.
 
+## Setup art
+
+- `setup/title-hero-v1.webp`: wide title-screen ambience showing the shattered
+  crown above a realm map, colored magical die-like gemstones, distant landmarks,
+  and dragon storm clouds. Used behind the match setup panel with code-rendered
+  title, faction controls, and buttons.
+
 ## Card category art
 
 Reusable square card-vignette artwork, generated as high-resolution PNGs and
@@ -52,6 +59,10 @@ as subtle right-side background art behind code-rendered text and controls.
   molten channels, and a glowing enchanted die being reforged.
 - `ui/shattered-crown-quest-v1.webp`: broken golden crown fragments suspended
   above parchment maps, candlelight, and violet-blue magic.
+- `ui/card-market-v1.webp`: candlelit magical bazaar card table with face-down
+  adventure cards, deck, coins, scrolls, relics, ally and tactic props.
+- `ui/victory-scoring-v1.webp`: dawn-lit throne-hall scoring table with a
+  partially restored crown, treasure, resources, relics, and forged plates.
 
 ## Shared generation constraints
 

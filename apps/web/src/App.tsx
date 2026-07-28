@@ -65,8 +65,11 @@ import arcanumPortrait from '../../../assets/generated/factions/arcanum-conclave
 import emberPortrait from '../../../assets/generated/factions/ember-dominion-v1.png';
 import stoneboundPortrait from '../../../assets/generated/factions/stonebound-league-v1.png';
 import verdantPortrait from '../../../assets/generated/factions/verdant-covenant-v1.png';
+import titleHeroArt from '../../../assets/generated/setup/title-hero-v1.webp';
+import cardMarketArt from '../../../assets/generated/ui/card-market-v1.webp';
 import forgeUpgradeArt from '../../../assets/generated/ui/forge-upgrade-v1.webp';
 import shatteredCrownQuestArt from '../../../assets/generated/ui/shattered-crown-quest-v1.webp';
+import victoryScoringArt from '../../../assets/generated/ui/victory-scoring-v1.webp';
 
 const SAVE_KEY = 'shattered-crown.debug-match.v4';
 const TUTORIAL_KEY = 'shattered-crown.tutorial-complete.v1';
@@ -1060,7 +1063,7 @@ export function App() {
 
   if (!game) {
     return (
-      <main className="setup-shell">
+      <main className="setup-shell" style={panelArtStyle(titleHeroArt)}>
         <section className="setup-card">
           <p className="eyebrow">A high-fantasy dice-placement duel</p>
           <h1>Realms of the Shattered Crown</h1>
@@ -1242,7 +1245,10 @@ export function App() {
       </section>
 
       {game.phase === 'complete' ? (
-        <section className="score-panel">
+        <section
+          className="score-panel"
+          style={panelArtStyle(victoryScoringArt)}
+        >
           <p className="eyebrow">Match complete</p>
           <h2>
             {game.result?.winnerIds.includes(human?.id as never)
@@ -1560,6 +1566,7 @@ export function App() {
                 dataTutorial="cards"
                 open={activePanel === 'cards'}
                 summary={`${human?.hand.length ?? 0} hand · ${game.cardDeck.length} deck`}
+                style={panelArtStyle(cardMarketArt)}
                 title="Cards and market"
                 onToggle={() => showPanel('cards')}
               >

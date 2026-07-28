@@ -45,18 +45,53 @@ button:disabled {
   opacity: 0.42;
 }
 .setup-shell {
+  position: relative;
   display: grid;
   min-height: 100vh;
   padding: 1rem;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      circle at 30% 35%,
+      rgb(214 160 76 / 18%),
+      transparent 28rem
+    ),
+    linear-gradient(90deg, rgb(8 6 6 / 82%), rgb(8 6 6 / 42%)),
+    var(--panel-art, none) center / cover no-repeat,
+    #0d0b0a;
   place-items: center;
 }
+.setup-shell::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: '';
+  background:
+    linear-gradient(
+      180deg,
+      rgb(0 0 0 / 42%),
+      transparent 34%,
+      rgb(0 0 0 / 56%)
+    ),
+    radial-gradient(
+      circle at 50% 100%,
+      rgb(232 178 86 / 14%),
+      transparent 34rem
+    );
+}
 .setup-card {
+  position: relative;
+  z-index: 1;
   width: min(42rem, 100%);
   padding: clamp(1.5rem, 6vw, 4rem);
   border: 1px solid #88683d;
   border-radius: 1rem;
-  background: rgb(20 16 14 / 92%);
-  box-shadow: 0 2rem 7rem #000;
+  background:
+    linear-gradient(135deg, rgb(39 27 19 / 92%), rgb(12 10 9 / 94%)),
+    rgb(20 16 14 / 92%);
+  box-shadow:
+    0 2rem 7rem #000,
+    inset 0 0 0 1px rgb(255 224 156 / 7%);
 }
 .setup-portrait {
   display: block;
@@ -831,6 +866,7 @@ select {
   order: 8;
 }
 .quest-panel,
+.card-panel,
 .forge-panel {
   position: relative;
   overflow: hidden;
@@ -840,11 +876,13 @@ select {
     #171410;
 }
 .quest-panel > *,
+.card-panel > *,
 .forge-panel > * {
   position: relative;
   z-index: 1;
 }
 .quest-panel::before,
+.card-panel::before,
 .forge-panel::before {
   position: absolute;
   inset: 0;
@@ -1321,10 +1359,34 @@ select {
   line-height: 1.55;
 }
 .score-panel {
+  position: relative;
+  overflow: hidden;
   max-width: 55rem;
   margin: 5rem auto;
   padding: clamp(1.5rem, 5vw, 3rem);
+  background:
+    linear-gradient(180deg, rgb(18 14 12 / 87%), rgb(18 14 12 / 96%)),
+    var(--panel-art, none) center / cover no-repeat,
+    rgb(18 16 14 / 94%);
+  box-shadow: 0 2rem 7rem rgb(0 0 0 / 55%);
   text-align: center;
+}
+.score-panel::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: '';
+  background:
+    radial-gradient(
+      circle at 50% 12%,
+      rgb(244 200 106 / 18%),
+      transparent 18rem
+    ),
+    linear-gradient(90deg, rgb(0 0 0 / 28%), transparent 42%, rgb(0 0 0 / 28%));
+}
+.score-panel > * {
+  position: relative;
+  z-index: 1;
 }
 .score-panel h2 {
   color: #f5d392;
