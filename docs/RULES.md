@@ -32,7 +32,7 @@ At least one live monster hunt is guaranteed to be open every round. If the roun
 
 ## Raid bosses
 
-Dragon Pass is a persistent raid. The Elder Dragon has a shared pool of 20 health that carries across rounds and is visible on the board and in the location preview. Any die placed at either slot wounds it by the die's rolled value, doubled by a natural six or a masterwork face. Wounds from both players accumulate into the same pool, so a rival can chip the beast down while you wait for a big die — but the player who lands the blow that empties the pool takes the entire bounty: 6 victory points and 3 gold from the hoard. Once slain, the pass reverts to an ordinary location for the rest of the match, and it no longer satisfies the guaranteed-hunt rule.
+Dragon Pass is a persistent raid. The Elder Dragon has a shared pool of 20 health that carries across rounds and is visible on the board and in the location preview. Any die placed at either slot wounds it by the die's rolled value, doubled by a natural six or a masterwork face. Wounds from both players accumulate into the same pool, so a rival can chip the beast down while you wait for a big die — but the player who lands the blow that empties the pool takes the entire bounty: 6 victory points to start, +2 more each round the dragon survives, and 3 gold from the hoard. Once slain, the pass reverts to an ordinary location for the rest of the match, and it no longer satisfies the guaranteed-hunt rule.
 
 ## The dragon's wrath
 
@@ -90,4 +90,4 @@ Final score is the sum of victory-point tokens — which include monster bountie
 
 ## Saves
 
-The debug client can save and restore authoritative state in local storage. Schema-v4 saves include the seed, current RNG state, round, active and sealed board regions, turn, placements, resources, dice faces, hands, market, deck, discard pile, upgrades, shared objectives with their claim status, and accumulated raid damage. Transient selection and animation state are excluded. Schema-v3 saves are rejected rather than silently migrated.
+The debug client can save and restore authoritative state in local storage. Schema-v4 saves include the seed, current RNG state, round, active and sealed board regions, turn, placements, resources, dice faces, hands, market, deck, discard pile, upgrades, shared objectives with their claim status, accumulated raid damage, raid survival counters, raid round-start damage, and current momentum chains. The browser save envelope also preserves selected CPU difficulty. Transient selection and animation state are excluded. Schema-v3 saves are rejected rather than silently migrated.

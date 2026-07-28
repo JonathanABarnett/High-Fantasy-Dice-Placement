@@ -1,11 +1,12 @@
 # Realms of the Shattered Crown
 
-A browser-first high-fantasy dice-placement strategy game. The repository is currently at **Milestone 4**: a complete deterministic match with executable cards, a seeded market, permanent die upgrades, an interactive PixiJS fantasy board, a replayable visual tutorial, and a growing combat/rivalry layer.
+A browser-first high-fantasy dice-placement strategy game. The repository is currently in **Milestone 5: Making it felt**: a complete deterministic match with executable cards, a seeded market, permanent die upgrades, an interactive PixiJS fantasy board, a replayable visual tutorial, and a growing combat/rivalry layer that now surfaces momentum, live standing, and dramatic event callouts.
 
 Combat and competition turn raw dice values into drama:
 
 - **Monster hunts** at Ruined Stronghold — beat a beast's threat to slay it, and every point over the threat loots extra spoils. A natural six or a forged masterwork face lands a **critical strike** for bonus victory points, so a high roll (or a die you deliberately upgraded at the Forge) is a genuine payoff rather than an overqualified gate-clear. At least one live hunt is open every round.
-- **The Elder Dragon** at Dragon Pass — a persistent raid boss with 20 health that carries across rounds. Both players' wounds land in the same pool, and whoever strikes the killing blow takes the entire bounty of 6 victory points and the gold hoard.
+- **The Elder Dragon** at Dragon Pass — a persistent raid boss with 20 health that carries across rounds. Both players' wounds land in the same pool, and whoever strikes the killing blow takes the entire bounty and the gold hoard. The bounty grows while the dragon survives, and the beast regenerates if ignored for a round.
+- **Momentum runs** — placing at locations that share a theme builds a run across the round. Three-link and longer runs score bonus victory points, making order and tempo matter.
 - **Bumping** — a strictly higher die plus one influence drives a rival off a contested slot. Their die returns to them ready, so it costs tempo rather than destroying it.
 - **Crown quests** — three shared, first-come objectives drawn per match. The moment someone meets one, it is theirs for good.
 
@@ -13,7 +14,7 @@ Combat and competition turn raw dice values into drama:
 
 All four factions are playable and pull on these systems differently: Ember are the fastest dragonslayers, Stonebound are hardest to shift off a slot, Arcanum displace rivals cheaply with magic, and Verdant field a sixth die and profit from being bumped.
 
-Choose **Learn to play** on the setup screen for a guided fifteen-step walkthrough. During a match, **How to play** reopens it without changing match state. The tutorial supports Back/Next controls, clickable progress markers, Left/Right Arrow navigation, and Escape to close, and now teaches the collapsible command panels alongside placement, cards, Forge upgrades, combat, raids, bumping, and Crown Quests.
+Choose **Learn to play** on the setup screen for a guided walkthrough. During a match, **How to play** reopens it without changing match state. The tutorial supports Back/Next controls, clickable progress markers, Left/Right Arrow navigation, and Escape to close, and teaches the command drawer alongside placement, cards, Forge upgrades, combat, raids, bumping, momentum, and Crown Quests.
 
 Hover or keyboard-focus resource and card-category tokens for rule explanations. Each two-player round opens six regions and eight contested slots, with more slots opening automatically for larger player counts; the rest are visibly sealed. Selecting a die makes every open board location display a textual **Playable**, **Blocked**, or **Full** state, while individual slots show their value, affinity, and payment requirements.
 

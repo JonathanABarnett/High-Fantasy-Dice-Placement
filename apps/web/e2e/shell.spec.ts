@@ -107,7 +107,7 @@ test('guides a new player through the complete visual tutorial', async ({
   await expect(page.getByTestId('tutorial-overlay')).toBeVisible();
 
   const remainingTitles = [
-    'Gather five resources',
+    'Read the live standing',
     'Read and select your dice',
     'Use the command center',
     'Place dice to gain rewards',

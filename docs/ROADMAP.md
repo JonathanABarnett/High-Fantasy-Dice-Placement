@@ -23,7 +23,7 @@ Implemented two-player setup, four initial factions, five dice per player, twelv
 
 ## Milestone 3 — Cards and dice upgrades
 
-**Status:** complete as a playable systems layer. Four starting cards and a deeper market use typed deterministic effects; the market replenishes from a seeded deck; hands and card actions are playable in the browser; twelve Forge-gated upgrades permanently replace die faces with resource, dual-symbol, or masterwork symbols; upgrade costs, previews, scoring, saves, collapsible panels, CPU evaluation, a replayable visual tutorial, and deterministic player-count-scaled board scarcity are integrated.
+**Status:** complete as a playable systems layer. Four starting cards and a deeper market use typed deterministic effects; the market replenishes from a seeded deck; hands and card actions are playable in the browser; twelve Forge-gated upgrades permanently replace die faces with resource, dual-symbol, or masterwork symbols; upgrade costs, previews, scoring, saves, a command-drawer sidebar, CPU evaluation, a replayable visual tutorial, and deterministic player-count-scaled board scarcity are integrated.
 
 ## Milestone 4 — Content and polish
 
@@ -45,7 +45,7 @@ All four faction identities are also complete, each with a distinct grip on thes
 - **Moment callouts** promote one headline per batch of events over the board, so a critical strike no longer reads like a resource tick.
 - **Opponent difficulty** (Squire / Knight / Warlord) with a top tier that weighs what each square is worth to _you_, verified to differ in real strength.
 
-Remaining: an information-hierarchy pass on the sidebar (still five collapsible panels), richer end-of-match scoring presentation, and audio.
+Remaining: compact card/market rows, tactile Forge before/after previews, richer end-of-match scoring presentation, refreshed art/audio feedback, and broader user-facing playtests around whether momentum and dragon wrath are legible without reading the log.
 
 ## Deferred
 

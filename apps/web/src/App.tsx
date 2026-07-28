@@ -66,6 +66,7 @@ import verdantPortrait from '../../../assets/generated/factions/verdant-covenant
 
 const SAVE_KEY = 'shattered-crown.debug-match.v4';
 const TUTORIAL_KEY = 'shattered-crown.tutorial-complete.v1';
+const SAVE_ENVELOPE_VERSION = 1;
 const FACTION_PORTRAITS: Readonly<Record<string, string>> = {
   'arcanum-conclave': arcanumPortrait,
   'ember-dominion': emberPortrait,
@@ -77,6 +78,41 @@ const CARD_CATEGORY_ART: Readonly<Record<CardCategory, string>> = {
   ally: allyCardArt,
   relic: relicCardArt,
 };
+
+interface SavedMatchEnvelope {
+  readonly envelopeVersion: typeof SAVE_ENVELOPE_VERSION;
+  readonly game: GameState;
+  readonly difficulty: CpuDifficulty;
+}
+
+function isCpuDifficulty(value: unknown): value is CpuDifficulty {
+  return (
+    typeof value === 'string' &&
+    CPU_DIFFICULTIES.some((tier) => tier.id === value)
+  );
+}
+
+function parseSavedMatch(serialized: string): {
+  readonly game: GameState;
+  readonly difficulty: CpuDifficulty | null;
+} {
+  const parsed: unknown = JSON.parse(serialized);
+  if (
+    parsed &&
+    typeof parsed === 'object' &&
+    'game' in parsed &&
+    'difficulty' in parsed
+  ) {
+    const envelope = parsed as Partial<SavedMatchEnvelope>;
+    return {
+      game: deserializeGame(JSON.stringify(envelope.game)),
+      difficulty: isCpuDifficulty(envelope.difficulty)
+        ? envelope.difficulty
+        : null,
+    };
+  }
+  return { game: deserializeGame(serialized), difficulty: null };
+}
 
 function cardArtStyle(category: CardCategory): CSSProperties {
   return {
@@ -959,7 +995,14 @@ export function App() {
 
   const saveMatch = () => {
     if (!game) return;
-    localStorage.setItem(SAVE_KEY, serializeGame(game));
+    localStorage.setItem(
+      SAVE_KEY,
+      JSON.stringify({
+        envelopeVersion: SAVE_ENVELOPE_VERSION,
+        game: JSON.parse(serializeGame(game)),
+        difficulty,
+      } satisfies SavedMatchEnvelope),
+    );
     setError('Match saved locally.');
   };
 
@@ -970,11 +1013,12 @@ export function App() {
       return;
     }
     try {
-      const restored = deserializeGame(saved);
-      setGame(restored);
+      const restored = parseSavedMatch(saved);
+      setGame(restored.game);
+      if (restored.difficulty) setDifficulty(restored.difficulty);
       setSelectedDieId(null);
       setUpgradeDieId(
-        restored.players.find((player) => player.controller === 'human')
+        restored.game.players.find((player) => player.controller === 'human')
           ?.dice[0]?.id ?? null,
       );
       setLog(['Saved match restored.']);

@@ -7,6 +7,7 @@ import type {
   FactionDefinition,
   FactionId,
   GameAction,
+  GameEvent,
   LocationId,
   ObjectiveId,
   PlayerId,
@@ -17,10 +18,12 @@ import type {
 
 import {
   applyAction,
+  chainBonusFor,
   createGame,
   deserializeGame,
   dieValue,
   enumerateLegalActions,
+  raidBountyFor,
   serializeGame,
   validateAction,
 } from './match.js';
@@ -614,6 +617,205 @@ describe('headless match', () => {
     const before = chip.state.players.find((p) => p.id === human.id)!;
     expect(slayer.victoryPoints - before.victoryPoints).toBe(6);
     expect(slayer.resources.gold - before.resources.gold).toBe(3);
+  });
+
+  it('scores themed momentum runs and breaks them on a new theme', () => {
+    const chainLocations: readonly BoardLocation[] = [
+      {
+        id: 'grove-a' as LocationId,
+        name: 'Grove A',
+        description: 'Nature link.',
+        tags: ['nature'],
+        reward: {},
+        slots: [
+          {
+            id: 'grove-a-slot' as SlotId,
+            occupantDieId: null,
+            occupantPlayerId: null,
+            requirement: {},
+          },
+        ],
+      },
+      {
+        id: 'grove-b' as LocationId,
+        name: 'Grove B',
+        description: 'Nature link.',
+        tags: ['nature'],
+        reward: {},
+        slots: [
+          {
+            id: 'grove-b-slot' as SlotId,
+            occupantDieId: null,
+            occupantPlayerId: null,
+            requirement: {},
+          },
+        ],
+      },
+      {
+        id: 'grove-c' as LocationId,
+        name: 'Grove C',
+        description: 'Nature link.',
+        tags: ['nature'],
+        reward: {},
+        slots: [
+          {
+            id: 'grove-c-slot' as SlotId,
+            occupantDieId: null,
+            occupantPlayerId: null,
+            requirement: {},
+          },
+        ],
+      },
+      {
+        id: 'vault-break' as LocationId,
+        name: 'Vault Break',
+        description: 'Different theme.',
+        tags: ['arcane'],
+        reward: {},
+        slots: [
+          {
+            id: 'vault-break-slot' as SlotId,
+            occupantDieId: null,
+            occupantPlayerId: null,
+            requirement: {},
+          },
+        ],
+      },
+    ];
+    let state = createGame({
+      seed: 'chain-test',
+      humanFactionId: factions[0]!.id,
+      cpuFactionId: factions[1]!.id,
+      content: { factions, locations: chainLocations, cards, upgrades },
+    }).state;
+    const human = state.players[0]!;
+
+    const place = (locationIndex: number, dieIndex: number) => {
+      const location = chainLocations[locationIndex]!;
+      state = {
+        ...state,
+        turn: { ...state.turn, activePlayerId: human.id },
+      };
+      const result = applyAction(state, {
+        type: 'place-die',
+        playerId: human.id,
+        dieId: human.dice[dieIndex]!.id,
+        locationId: location.id,
+        slotId: location.slots[0]!.id,
+      });
+      state = result.state;
+      return result;
+    };
+
+    place(0, 0);
+    expect(state.players[0]!.chain).toMatchObject({ length: 1 });
+    expect(state.players[0]!.victoryPoints).toBe(0);
+
+    const second = place(1, 1);
+    expect(state.players[0]!.chain).toMatchObject({ length: 2 });
+    expect(second.events).toContainEqual(
+      expect.objectContaining({
+        type: 'chain-extended',
+        length: 2,
+        bonusVictoryPoints: 0,
+      }),
+    );
+
+    const third = place(2, 2);
+    expect(chainBonusFor(3)).toBe(2);
+    expect(state.players[0]!.chain).toMatchObject({ length: 3 });
+    expect(state.players[0]!.victoryPoints).toBe(2);
+    expect(third.events).toContainEqual(
+      expect.objectContaining({
+        type: 'chain-extended',
+        length: 3,
+        bonusVictoryPoints: 2,
+      }),
+    );
+
+    place(3, 3);
+    expect(state.players[0]!.chain).toMatchObject({ length: 1 });
+    expect(state.players[0]!.victoryPoints).toBe(2);
+  });
+
+  it('grows and regenerates a surviving raid boss between rounds', () => {
+    const raidLocation: BoardLocation = {
+      id: 'wrath-pass' as LocationId,
+      name: 'Wrath Pass',
+      description: 'A dragon waits.',
+      tags: ['martial'],
+      reward: {},
+      encounter: {
+        title: 'Wrath Pass',
+        beasts: ['Elder Dragon'],
+        loot: 'gold',
+        criticalBonus: 2,
+        health: 20,
+        bounty: { victoryPoints: 6, loot: { gold: 3 } },
+      },
+      slots: [
+        {
+          id: 'wrath-a' as SlotId,
+          occupantDieId: null,
+          occupantPlayerId: null,
+          requirement: {},
+        },
+      ],
+    };
+    let state = createGame({
+      seed: 'wrath-test',
+      humanFactionId: factions[0]!.id,
+      cpuFactionId: factions[1]!.id,
+      content: { factions, locations: [raidLocation], cards, upgrades },
+      maximumRounds: 4,
+    }).state;
+    state = {
+      ...state,
+      raidDamage: { [raidLocation.id]: 4 },
+      raidDamageAtRoundStart: { [raidLocation.id]: 0 },
+    };
+
+    const passIntoNextRound = () => {
+      const startingRound = state.round.number;
+      const roundEvents: GameEvent[] = [];
+      while (
+        state.round.number === startingRound &&
+        state.phase !== 'complete'
+      ) {
+        const result = applyAction(state, {
+          type: 'pass',
+          playerId: state.turn.activePlayerId,
+        });
+        state = result.state;
+        roundEvents.push(...result.events);
+      }
+      return roundEvents;
+    };
+
+    const woundedRound = passIntoNextRound();
+    expect(state.raidDamage[raidLocation.id]).toBe(4);
+    expect(state.raidRoundsSurvived?.[raidLocation.id]).toBe(1);
+    expect(raidBountyFor(raidLocation, 1)).toBe(8);
+    expect(woundedRound).toContainEqual(
+      expect.objectContaining({
+        type: 'raid-enraged',
+        regenerated: 0,
+        bountyVictoryPoints: 8,
+      }),
+    );
+
+    const ignoredRound = passIntoNextRound();
+    expect(state.raidDamage[raidLocation.id]).toBe(0);
+    expect(state.raidRoundsSurvived?.[raidLocation.id]).toBe(2);
+    expect(raidBountyFor(raidLocation, 2)).toBe(10);
+    expect(ignoredRound).toContainEqual(
+      expect.objectContaining({
+        type: 'raid-enraged',
+        regenerated: 4,
+        remaining: 20,
+        bountyVictoryPoints: 10,
+      }),
+    );
   });
 
   it('bumps an enemy die with a higher value and returns it ready', () => {
