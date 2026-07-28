@@ -27,10 +27,10 @@ const STEPS: readonly TutorialStep[] = [
   {
     anchor: 'players',
     eyebrow: 'Your realm',
-    title: 'Gather five resources',
+    title: 'Read the live standing',
     symbol: '◈',
-    body: 'Gold, mana, knowledge, materials, and influence pay for locations, cards, and upgrades. Victory points are your main score.',
-    tip: 'Unspent resources also provide up to 3 points at game end.',
+    body: 'The player strip shows the real current score, not just victory-point tokens. Gold, mana, knowledge, materials, and influence are inputs for locations, cards, and upgrades, and reserves can still matter at scoring.',
+    tip: 'The loud number answers “am I winning?”; the small resource icons answer “what can I afford?”',
   },
   {
     anchor: 'dice',
@@ -45,8 +45,8 @@ const STEPS: readonly TutorialStep[] = [
     eyebrow: 'Keep the table clear',
     title: 'Use the command center',
     symbol: '◇',
-    body: 'Your dice, pass button, and round pressure live together in the turn panel because they are the controls you use every round. Reference panels can be opened only when you need them.',
-    tip: 'If the table feels crowded, collapse cards, quests, forge, or the log. The board and dice should remain your main loop.',
+    body: 'Your dice, momentum, pass button, and drawer shortcuts live together because they are the controls you use every round. The drawer shows one support panel at a time.',
+    tip: 'A glowing dot on Cards or Forge means a real turn-spending action is available there.',
   },
   {
     anchor: 'board',
@@ -54,7 +54,7 @@ const STEPS: readonly TutorialStep[] = [
     title: 'Place dice to gain rewards',
     symbol: '⌖',
     body: 'Choose a glowing location after selecting a die. Empty slots may demand a minimum value, affinity, or resource payment.',
-    tip: 'You can also drag a die directly onto a location.',
+    tip: 'Placements that share a theme build momentum. A three-link run starts scoring bonus points, so sequence matters.',
   },
   {
     anchor: 'preview',
@@ -69,8 +69,8 @@ const STEPS: readonly TutorialStep[] = [
     eyebrow: 'Keep the table clear',
     title: 'Open only the panels you need',
     symbol: '▾',
-    body: 'Most side panels can collapse. Keep Location Preview open while choosing a placement, then show quests, cards, Forge, pressure, or the log only when that decision needs them.',
-    tip: 'The dice and location preview are your main turn tools. The rest is supporting information.',
+    body: 'Use the drawer shortcuts to switch between Cards, Quests, Forge, Pressure, and Log. The location decision dock stays near the board, so placement details do not disappear when you check another panel.',
+    tip: 'The board, dice, and decision dock are your main loop. The drawer is supporting information.',
   },
   {
     anchor: 'hunt-location',
@@ -86,7 +86,7 @@ const STEPS: readonly TutorialStep[] = [
     title: 'Wound the Elder Dragon together',
     symbol: '🜂',
     body: 'Dragon Pass is a raid. The dragon keeps one pool of health across every round, and both players wound the same pool — a critical hit bites twice as deep.',
-    tip: 'Only the blow that empties the pool wins the bounty and the hoard, so watch how badly your rival has hurt it before you commit a big die.',
+    tip: 'The hoard grows each round the dragon survives, but if nobody wounds it that round, it regenerates. Only the killing blow claims the bounty.',
   },
   {
     anchor: 'board',
@@ -102,7 +102,7 @@ const STEPS: readonly TutorialStep[] = [
     title: 'Play cards, buy engines',
     symbol: '✦',
     body: 'Your faction begins with a unique card. Playing or acquiring a card uses your turn. The market includes immediate tactics plus payoff cards that cash in monsters slain, combat placements, and forged die faces.',
-    tip: 'Some cards need a ready die selected as their target. Cards and market can be collapsed between buys to keep the table compact.',
+    tip: 'Some cards need a ready die selected as their target. Use the Cards shortcut when it has a dot, then return to the board.',
   },
   {
     anchor: 'forge-location',
@@ -118,7 +118,7 @@ const STEPS: readonly TutorialStep[] = [
     title: 'Claim the Crown Quests first',
     symbol: '★',
     body: 'Three shared quests are drawn each match and both players chase the same three. Quests can care about monsters, resources, upgrades, placements, cards played, or even ally and relic cards specifically.',
-    tip: 'The moment someone meets a quest, its points are theirs forever. Open this panel early, choose a race, then collapse it until you need a reminder.',
+    tip: 'The moment someone meets a quest, its points are theirs forever. Check this drawer early, choose a race, then return to the board.',
   },
   {
     anchor: 'pass',
@@ -133,7 +133,7 @@ const STEPS: readonly TutorialStep[] = [
     eyebrow: 'The final reckoning',
     title: 'Follow the log and build your score',
     symbol: '♜',
-    body: 'The log starts collapsed to save space. Open it when you want to verify exactly what resolved, then collapse it again so the board remains the focus.',
+    body: 'Big swings appear as callouts over the board. Open the log when you want to verify exactly what resolved, then return to the current turn.',
     tip: 'After round six, victory points, reserves, faction scoring, played allies and relics, and die enhancements are totaled. Same seed and choices, same match.',
   },
 ];

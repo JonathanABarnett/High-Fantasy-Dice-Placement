@@ -2,6 +2,7 @@ import type {
   ActionValidation,
   BoardLocation,
   Card,
+  ChainState,
   ClaimableObjective,
   Die,
   DieAffinity,
@@ -58,6 +59,47 @@ const ARCANE_BUMP_COST: Partial<ResourcePool> = { mana: 1 };
 const EMBER_RAID_BONUS = 2;
 /** Extra influence demanded to shift a Stonebound die. */
 const STONEBOUND_BUMP_TAX: Partial<ResourcePool> = { influence: 1 };
+
+/**
+ * Victory points for extending a themed run of placements, by run length.
+ * Short runs pay nothing, so the reward is for committing to a plan across a
+ * whole round rather than for two placements that happen to rhyme.
+ */
+export function chainBonusFor(length: number): number {
+  if (length >= 5) return 4;
+  if (length === 4) return 3;
+  if (length === 3) return 2;
+  return 0;
+}
+
+/** Health a raid boss claws back in a round where nobody wounded it. */
+const RAID_REGENERATION = 5;
+/** Victory points added to a raid boss's hoard for each round it survives. */
+const RAID_HOARD_GROWTH = 2;
+
+/**
+ * What the killing blow on this raid is currently worth. The hoard swells for
+ * every round the beast survives, so a dragon left alone becomes both harder
+ * to finish and richer to finish — the reason to engage it grows with the risk.
+ */
+export function raidBountyFor(
+  location: BoardLocation,
+  roundsSurvived: number,
+): number {
+  const base = location.encounter?.bounty?.victoryPoints ?? 0;
+  return base + roundsSurvived * RAID_HOARD_GROWTH;
+}
+
+/** The run a placement at these tags would produce, given the current run. */
+export function extendChain(
+  chain: ChainState | undefined,
+  tags: readonly string[],
+): ChainState {
+  const continues = Boolean(
+    chain?.length && tags.some((tag) => chain.tags.includes(tag)),
+  );
+  return { tags, length: continues ? (chain?.length ?? 0) + 1 : 1 };
+}
 
 /**
  * What the attacker pays, on top of any slot cost, to bump the defender.
@@ -460,6 +502,8 @@ export function createGame(options: CreateGameOptions): TransitionResult {
       upgrades: options.content.upgrades ?? [],
       objectives,
       raidDamage: {},
+      raidRoundsSurvived: {},
+      raidDamageAtRoundStart: {},
       round: {
         number: 1,
         maximum: options.maximumRounds ?? 6,
@@ -952,58 +996,80 @@ function cappedAmount(amount: number, maxAmount?: number): number {
   return Math.max(0, Math.min(maxAmount ?? amount, amount));
 }
 
+/**
+ * The score breakdown for one player from the current state. Exported so the
+ * interface can show a live standing mid-match: the winning condition is not
+ * victory-point tokens alone, so showing only those would tell the player the
+ * wrong story about who is ahead.
+ */
+export function scorePlayer(
+  state: GameState,
+  playerId: PlayerId,
+): readonly ScoreBreakdown[] {
+  const player = state.players.find((item) => item.id === playerId);
+  if (!player) return [];
+  const resourceTotal = RESOURCE_TYPES.reduce(
+    (total, resource) => total + player.resources[resource],
+    0,
+  );
+  let factionPoints = 0;
+  if (player.factionAbilityId === 'arcane-resonance')
+    factionPoints = Math.floor(player.resources.mana / 2);
+  if (player.factionAbilityId === 'martial-glory')
+    factionPoints = Math.floor((player.placementCounts.martial ?? 0) / 2);
+  if (player.factionAbilityId === 'verdant-adaptation') {
+    // Breadth, not depth: score each resource type held in real quantity.
+    // Counting types that are merely non-zero capped this at 1 point, which
+    // made the faction's scoring rule a trap next to the other three.
+    factionPoints = RESOURCE_TYPES.filter(
+      (resource) => player.resources[resource] >= 3,
+    ).length;
+  }
+  if (player.factionAbilityId === 'stonebound-craft') {
+    // Stonebound already convert materials into forged faces, which score on
+    // their own and now also drive critical strikes, so hoarding pays slower.
+    factionPoints = Math.floor(player.resources.materials / 5);
+  }
+  const cardPoints = player.playedCards.reduce((total, cardId) => {
+    const card = state.cards.find((item) => item.id === cardId);
+    return total + (card && card.category !== 'tactic' ? 1 : 0);
+  }, 0);
+  const upgradePoints = player.dice.reduce(
+    (total, die) =>
+      total +
+      die.enhancements.reduce(
+        (dieTotal, upgradeId) =>
+          dieTotal +
+          (state.upgrades.find((item) => item.id === upgradeId)?.scoreValue ??
+            0),
+        0,
+      ),
+    0,
+  );
+  return [
+    { source: 'Victory-point tokens', points: player.victoryPoints },
+    {
+      source: 'Resource reserves',
+      points: Math.min(3, Math.floor(resourceTotal / 5)),
+    },
+    { source: 'Faction scoring', points: factionPoints },
+    { source: 'Allies and relics', points: cardPoints },
+    { source: 'Die enhancements', points: upgradePoints },
+  ];
+}
+
+/** Total of a player's score breakdown at the current moment. */
+export function scoreTotal(state: GameState, playerId: PlayerId): number {
+  return scorePlayer(state, playerId).reduce(
+    (total, item) => total + item.points,
+    0,
+  );
+}
+
 function scoreMatch(state: GameState): MatchResult {
   const scores = {} as Record<PlayerId, readonly ScoreBreakdown[]>;
-  for (const player of state.players) {
-    const resourceTotal = RESOURCE_TYPES.reduce(
-      (total, resource) => total + player.resources[resource],
-      0,
-    );
-    let factionPoints = 0;
-    if (player.factionAbilityId === 'arcane-resonance')
-      factionPoints = Math.floor(player.resources.mana / 2);
-    if (player.factionAbilityId === 'martial-glory')
-      factionPoints = Math.floor((player.placementCounts.martial ?? 0) / 2);
-    if (player.factionAbilityId === 'verdant-adaptation') {
-      // Breadth, not depth: score each resource type held in real quantity.
-      // Counting types that are merely non-zero capped this at 1 point, which
-      // made the faction's scoring rule a trap next to the other three.
-      factionPoints = RESOURCE_TYPES.filter(
-        (resource) => player.resources[resource] >= 3,
-      ).length;
-    }
-    if (player.factionAbilityId === 'stonebound-craft') {
-      // Stonebound already convert materials into forged faces, which score on
-      // their own and now also drive critical strikes, so hoarding pays slower.
-      factionPoints = Math.floor(player.resources.materials / 5);
-    }
-    const cardPoints = player.playedCards.reduce((total, cardId) => {
-      const card = state.cards.find((item) => item.id === cardId);
-      return total + (card && card.category !== 'tactic' ? 1 : 0);
-    }, 0);
-    const upgradePoints = player.dice.reduce(
-      (total, die) =>
-        total +
-        die.enhancements.reduce(
-          (dieTotal, upgradeId) =>
-            dieTotal +
-            (state.upgrades.find((item) => item.id === upgradeId)?.scoreValue ??
-              0),
-          0,
-        ),
-      0,
-    );
-    scores[player.id] = [
-      { source: 'Victory-point tokens', points: player.victoryPoints },
-      {
-        source: 'Resource reserves',
-        points: Math.min(3, Math.floor(resourceTotal / 5)),
-      },
-      { source: 'Faction scoring', points: factionPoints },
-      { source: 'Allies and relics', points: cardPoints },
-      { source: 'Die enhancements', points: upgradePoints },
-    ];
-  }
+  for (const player of state.players)
+    scores[player.id] = scorePlayer(state, player.id);
   const totals = state.players.map((player) => ({
     id: player.id,
     score: (scores[player.id] ?? []).reduce(
@@ -1050,15 +1116,54 @@ function finishOrStartRound(state: GameState): TransitionResult {
   const resetPlayers = state.players.map((player) => ({
     ...player,
     hasPassed: false,
+    // Each round is its own run: last round's theme does not carry over.
+    chain: { tags: [], length: 0 },
   }));
+
+  // A surviving raid boss takes its turn too: it hoards more treasure, and if
+  // nobody wounded it this round it claws health back. Leaving it alone is a
+  // choice with a cost, which is what stops the board being pure accumulation.
+  let raidDamage = state.raidDamage;
+  const roundsSurvived: Record<string, number> = {
+    ...(state.raidRoundsSurvived ?? {}),
+  };
+  const wrathEvents: GameEvent[] = [];
+  let wrathSequence = state.eventSequence;
+  for (const location of state.locations) {
+    const health = location.encounter?.health;
+    if (health === undefined) continue;
+    const damage = raidDamage[location.id] ?? 0;
+    if (damage >= health) continue;
+    const before = state.raidDamageAtRoundStart?.[location.id] ?? 0;
+    const ignored = damage <= before;
+    const survived = (roundsSurvived[location.id] ?? 0) + 1;
+    roundsSurvived[location.id] = survived;
+    const healed = ignored ? Math.min(damage, RAID_REGENERATION) : 0;
+    if (healed > 0)
+      raidDamage = { ...raidDamage, [location.id]: damage - healed };
+    const remaining = health - (raidDamage[location.id] ?? 0);
+    wrathSequence += 1;
+    wrathEvents.push({
+      type: 'raid-enraged',
+      sequence: wrathSequence,
+      locationId: location.id,
+      beast: location.encounter?.beasts[0] ?? location.name,
+      regenerated: healed,
+      remaining,
+      health,
+      bountyVictoryPoints: raidBountyFor(location, survived),
+      roundsSurvived: survived,
+    });
+  }
+
   const roundLocations = configureRoundScarcity(
     state.locations,
     random,
     state.players.length,
     state.players.reduce((total, player) => total + player.dice.length, 0),
-    slainRaids(state.locations, state.raidDamage),
+    slainRaids(state.locations, raidDamage),
   );
-  const roundSequence = state.eventSequence + 1;
+  const roundSequence = wrathSequence + 1;
   const rolled = rollPlayers(resetPlayers, random, roundSequence);
   return {
     state: {
@@ -1066,6 +1171,9 @@ function finishOrStartRound(state: GameState): TransitionResult {
       players: rolled.players,
       locations: roundLocations,
       rngState: random.snapshot().state,
+      raidDamage,
+      raidRoundsSurvived: roundsSurvived,
+      raidDamageAtRoundStart: raidDamage,
       round: {
         number: nextRound,
         maximum: state.round.maximum,
@@ -1079,6 +1187,7 @@ function finishOrStartRound(state: GameState): TransitionResult {
       eventSequence: rolled.sequence,
     },
     events: [
+      ...wrathEvents,
       { type: 'round-started', sequence: roundSequence, round: nextRound },
       ...rolled.events,
     ],
@@ -1514,7 +1623,11 @@ export function applyAction(
           if (total >= health) {
             slainBeast = beast;
             if (encounter.bounty) {
-              bonusPoints += encounter.bounty.victoryPoints;
+              // The hoard has grown for every round the beast stayed alive.
+              bonusPoints += raidBountyFor(
+                location,
+                state.raidRoundsSurvived?.[location.id] ?? 0,
+              );
               for (const resource of RESOURCE_TYPES) {
                 const amount = encounter.bounty.loot?.[resource] ?? 0;
                 if (amount) bonus[resource] = (bonus[resource] ?? 0) + amount;
@@ -1533,6 +1646,12 @@ export function applyAction(
       }
     }
     const slewMonster = slainBeast !== null;
+
+    // A themed run of placements pays out as it lengthens, so the order dice
+    // are committed in matters as much as which slots they land on.
+    const chain = extendChain(actingPlayer.chain, location.tags);
+    const chainBonus = chainBonusFor(chain.length);
+    bonusPoints += chainBonus;
 
     reward = {
       ...reward,
@@ -1562,6 +1681,7 @@ export function applyAction(
             bonusPoints,
           placementCounts,
           monstersSlain: player.monstersSlain + (slewMonster ? 1 : 0),
+          chain,
           dice: player.dice.map((item) =>
             item.id === action.dieId
               ? { ...item, status: 'placed' as const }
@@ -1635,6 +1755,17 @@ export function applyAction(
         overkill,
         critical,
         bonusVictoryPoints: (location.reward.victoryPoints ?? 0) + bonusPoints,
+      });
+    }
+    if (chain.length >= 2) {
+      sequence += 1;
+      events.push({
+        type: 'chain-extended',
+        sequence,
+        playerId: action.playerId,
+        tag: location.tags[0] ?? '',
+        length: chain.length,
+        bonusVictoryPoints: chainBonus,
       });
     }
     if (raidChip) {

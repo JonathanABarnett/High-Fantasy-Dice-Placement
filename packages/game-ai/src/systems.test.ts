@@ -22,6 +22,12 @@ interface SystemMetrics {
   readonly bumps: number;
   readonly claims: number;
   readonly boosts: number;
+  readonly enrages: number;
+  readonly regens: number;
+  readonly maxBounty: number;
+  readonly chainScores: number;
+  readonly chainPoints: number;
+  readonly longestChain: number;
   readonly steals: number;
   readonly roundsWithHunt: number;
   readonly rounds: number;
@@ -40,6 +46,12 @@ function simulateSystems(seedCount: number): SystemMetrics {
   let bumps = 0;
   let claims = 0;
   let boosts = 0;
+  let enrages = 0;
+  let regens = 0;
+  let maxBounty = 0;
+  let chainScores = 0;
+  let chainPoints = 0;
+  let longestChain = 0;
   let steals = 0;
   let roundsWithHunt = 0;
   let rounds = 0;
@@ -106,6 +118,17 @@ function simulateSystems(seedCount: number): SystemMetrics {
           seedClaims += 1;
         }
         if (event.type === 'die-boosted') boosts += 1;
+        if (event.type === 'raid-enraged') {
+          enrages += 1;
+          if (event.regenerated > 0) regens += 1;
+          if (event.bountyVictoryPoints > maxBounty)
+            maxBounty = event.bountyVictoryPoints;
+        }
+        if (event.type === 'chain-extended') {
+          if (event.bonusVictoryPoints > 0) chainScores += 1;
+          chainPoints += event.bonusVictoryPoints;
+          if (event.length > longestChain) longestChain = event.length;
+        }
         if (event.type === 'resource-stolen') steals += 1;
       }
       state = result.state;
@@ -130,6 +153,12 @@ function simulateSystems(seedCount: number): SystemMetrics {
     claims,
     boosts,
     steals,
+    enrages,
+    regens,
+    maxBounty,
+    chainScores,
+    chainPoints,
+    longestChain,
     roundsWithHunt,
     rounds,
     seedsWithBump,
@@ -157,6 +186,21 @@ describe('milestone 4 systems', () => {
     expect(metrics.seedsWithDragonKill / metrics.seeds).toBeGreaterThan(0.5);
     expect(metrics.seedsWithBump).toBe(metrics.seeds);
     expect(metrics.seedsWithClaim).toBe(metrics.seeds);
+
+    // Themed runs pay out often enough to plan around, without dwarfing the
+    // rest of the scoreboard. Roughly 4-6 points a match against ~40 totals.
+    expect(metrics.chainScores).toBeGreaterThan(0);
+    const chainPerMatch = metrics.chainPoints / metrics.seeds;
+    expect(chainPerMatch).toBeGreaterThan(1);
+    expect(chainPerMatch).toBeLessThan(10);
+
+    // A surviving raid boss takes its own turn: its hoard grows, and it heals
+    // in rounds nobody wounds it, so ignoring it costs ground. It must stay
+    // beatable — a dragon that always survives is a wall, not a threat.
+    expect(metrics.enrages).toBeGreaterThan(0);
+    expect(metrics.regens).toBeGreaterThan(0);
+    expect(metrics.maxBounty).toBeGreaterThan(6);
+    expect(metrics.seedsWithDragonKill / metrics.seeds).toBeGreaterThan(0.6);
 
     // The system-facing cards get played rather than sitting dead in hand.
     expect(metrics.boosts).toBeGreaterThan(0);

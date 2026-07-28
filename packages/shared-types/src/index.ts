@@ -236,6 +236,19 @@ export interface PlayerState {
   readonly hasPassed: boolean;
   readonly placementCounts: Readonly<Record<string, number>>;
   readonly monstersSlain: number;
+  /**
+   * The themed run of placements built this round. Placing at a location that
+   * shares a tag with your previous placement extends the chain; anything else
+   * restarts it. Cleared each round, so it rewards planning a whole round's
+   * sequence rather than taking the best isolated slot each turn.
+   */
+  readonly chain?: ChainState;
+}
+
+export interface ChainState {
+  /** Tags of the most recent placement, matched against to continue the run. */
+  readonly tags: readonly string[];
+  readonly length: number;
 }
 
 export interface RoundState {
@@ -267,6 +280,14 @@ export interface GameState {
   readonly objectives: readonly ClaimableObjective[];
   /** Accumulated damage on persistent raid bosses, keyed by location id. */
   readonly raidDamage: Readonly<Record<string, number>>;
+  /**
+   * Rounds each raid boss has survived, keyed by location id. A surviving
+   * beast grows its hoard, so the longer it lives the richer the kill — and it
+   * regenerates in any round nobody wounds it, so ignoring it costs ground.
+   */
+  readonly raidRoundsSurvived?: Readonly<Record<string, number>>;
+  /** Raid damage as of this round's start, used to detect an ignored beast. */
+  readonly raidDamageAtRoundStart?: Readonly<Record<string, number>>;
   readonly round: RoundState;
   readonly turn: TurnState;
   readonly eventSequence: number;
@@ -429,6 +450,27 @@ export type GameEvent =
       readonly victimPlayerId: PlayerId;
       readonly resource: ResourceType;
       readonly amount: number;
+    }
+  | {
+      readonly type: 'chain-extended';
+      readonly sequence: number;
+      readonly playerId: PlayerId;
+      readonly tag: string;
+      readonly length: number;
+      readonly bonusVictoryPoints: number;
+    }
+  | {
+      readonly type: 'raid-enraged';
+      readonly sequence: number;
+      readonly locationId: LocationId;
+      readonly beast: string;
+      /** Health clawed back because nobody wounded it this round. */
+      readonly regenerated: number;
+      readonly remaining: number;
+      readonly health: number;
+      /** The hoard it has hoarded by surviving, in victory points. */
+      readonly bountyVictoryPoints: number;
+      readonly roundsSurvived: number;
     };
 
 export interface ScoreBreakdown {

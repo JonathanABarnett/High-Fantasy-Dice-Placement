@@ -6,7 +6,11 @@ import {
   useState,
 } from 'react';
 
-import { chooseCpuAction } from '@shattered-crown/game-ai';
+import {
+  chooseCpuAction,
+  CPU_DIFFICULTIES,
+  type CpuDifficulty,
+} from '@shattered-crown/game-ai';
 import {
   cards,
   factions,
@@ -16,11 +20,15 @@ import {
 } from '@shattered-crown/game-content';
 import {
   applyAction,
+  chainBonusFor,
   createGame,
   deserializeGame,
   dieValue,
   enumerateLegalActions,
+  extendChain,
+  raidBountyFor,
   raidDamageFor,
+  scoreTotal,
   serializeGame,
   validateAction,
 } from '@shattered-crown/game-engine';
@@ -28,6 +36,7 @@ import type {
   CardCategory,
   DieId,
   FactionId,
+  PlayerId,
   GameAction,
   GameEvent,
   GameState,
@@ -57,6 +66,7 @@ import verdantPortrait from '../../../assets/generated/factions/verdant-covenant
 
 const SAVE_KEY = 'shattered-crown.debug-match.v4';
 const TUTORIAL_KEY = 'shattered-crown.tutorial-complete.v1';
+const SAVE_ENVELOPE_VERSION = 1;
 const FACTION_PORTRAITS: Readonly<Record<string, string>> = {
   'arcanum-conclave': arcanumPortrait,
   'ember-dominion': emberPortrait,
@@ -68,6 +78,41 @@ const CARD_CATEGORY_ART: Readonly<Record<CardCategory, string>> = {
   ally: allyCardArt,
   relic: relicCardArt,
 };
+
+interface SavedMatchEnvelope {
+  readonly envelopeVersion: typeof SAVE_ENVELOPE_VERSION;
+  readonly game: GameState;
+  readonly difficulty: CpuDifficulty;
+}
+
+function isCpuDifficulty(value: unknown): value is CpuDifficulty {
+  return (
+    typeof value === 'string' &&
+    CPU_DIFFICULTIES.some((tier) => tier.id === value)
+  );
+}
+
+function parseSavedMatch(serialized: string): {
+  readonly game: GameState;
+  readonly difficulty: CpuDifficulty | null;
+} {
+  const parsed: unknown = JSON.parse(serialized);
+  if (
+    parsed &&
+    typeof parsed === 'object' &&
+    'game' in parsed &&
+    'difficulty' in parsed
+  ) {
+    const envelope = parsed as Partial<SavedMatchEnvelope>;
+    return {
+      game: deserializeGame(JSON.stringify(envelope.game)),
+      difficulty: isCpuDifficulty(envelope.difficulty)
+        ? envelope.difficulty
+        : null,
+    };
+  }
+  return { game: deserializeGame(serialized), difficulty: null };
+}
 
 function cardArtStyle(category: CardCategory): CSSProperties {
   return {
@@ -92,6 +137,13 @@ function describeEvent(event: GameEvent, state: GameState): string {
     return `Die ${event.dieId.split('-').at(-1)} rolled ${event.faceIndex + 1}.`;
   if (event.type === 'die-rerolled')
     return `Die ${event.dieId.split('-').at(-1)} rerolled ${event.faceIndex + 1}.`;
+  if (event.type === 'raid-enraged') {
+    const healed =
+      event.regenerated > 0
+        ? ` and regenerated ${event.regenerated} health (${event.remaining}/${event.health})`
+        : '';
+    return `🐉 The ${event.beast} survived round ${event.roundsSurvived}${healed}. Its hoard is now worth ${event.bountyVictoryPoints}★.`;
+  }
   const player =
     state.players.find((item) => item.id === event.playerId)?.name ?? 'Player';
   if (event.type === 'player-passed') return `${player} passed.`;
@@ -118,6 +170,11 @@ function describeEvent(event: GameEvent, state: GameState): string {
       state.locations.find((item) => item.id === event.locationId)?.name ??
       event.locationId;
     return `⚡ ${player} bumped ${victim}'s die off ${location}!`;
+  }
+  if (event.type === 'chain-extended') {
+    return event.bonusVictoryPoints > 0
+      ? `🔥 ${player} extended a ${event.tag} run to ${event.length} for +${event.bonusVictoryPoints} VP!`
+      : `${player} began a ${event.tag} run (${event.length}).`;
   }
   if (event.type === 'die-boosted') {
     return `↑ ${player} empowered a die by +${event.amount} to value ${event.value}.`;
@@ -149,6 +206,114 @@ function describeEvent(event: GameEvent, state: GameState): string {
     return `${player} forged ${upgrade?.name ?? event.upgradeId} onto die ${event.dieId.split('-').at(-1)}.`;
   }
   return `${player} gained ${event.amount} victory point${event.amount === 1 ? '' : 's'}.`;
+}
+
+interface Callout {
+  readonly title: string;
+  readonly detail: string;
+  readonly tone: 'triumph' | 'blow' | 'quest' | 'chain';
+  /** Highest-weight event in a batch becomes the headline. */
+  readonly weight: number;
+  readonly key?: number;
+}
+
+/**
+ * Picks the one event in a batch worth interrupting the player for. Without
+ * this, a killing blow and a resource tick read identically — a line of text in
+ * a log panel that is usually collapsed.
+ */
+function calloutFor(event: GameEvent, state: GameState): Callout | null {
+  const who = state.players.find(
+    (item) => item.id === (event as { playerId?: string }).playerId,
+  );
+  const mine = who?.controller === 'human';
+  const actor = mine ? 'You' : (who?.name ?? 'The CPU');
+  if (event.type === 'monster-slain') {
+    const killingBlow = event.overkill === 0 && !event.critical;
+    return {
+      title: event.critical ? 'CRITICAL STRIKE!' : 'SLAIN!',
+      detail: `${actor} felled the ${event.beast} for ${event.bonusVictoryPoints}★${
+        killingBlow ? ' and the hoard' : ''
+      }.`,
+      tone: 'triumph',
+      weight: event.critical ? 100 : 90,
+    };
+  }
+  if (event.type === 'objective-claimed') {
+    const objective = state.objectives.find(
+      (item) => item.id === event.objectiveId,
+    );
+    return {
+      title: 'QUEST CLAIMED',
+      detail: `${actor} took "${objective?.name ?? 'a quest'}" for ${event.victoryPoints}★.`,
+      tone: 'quest',
+      weight: 80,
+    };
+  }
+  if (event.type === 'chain-extended' && event.bonusVictoryPoints > 0) {
+    return {
+      title: `${event.tag.toUpperCase()} RUN ×${event.length}`,
+      detail: `${actor} kept the run alive for +${event.bonusVictoryPoints}★.`,
+      tone: 'chain',
+      weight: 60 + event.length,
+    };
+  }
+  if (event.type === 'die-bumped') {
+    const victim = state.players.find(
+      (item) => item.id === event.victimPlayerId,
+    );
+    return {
+      title: 'BUMPED!',
+      detail: `${actor} drove ${victim?.controller === 'human' ? 'your' : 'the rival'} die off the slot.`,
+      tone: 'blow',
+      weight: 70,
+    };
+  }
+  if (event.type === 'raid-enraged') {
+    return {
+      title: event.regenerated > 0 ? 'THE BEAST RECOVERS' : 'THE HOARD GROWS',
+      detail:
+        event.regenerated > 0
+          ? `Left alone, the ${event.beast} healed ${event.regenerated} — and its hoard is now ${event.bountyVictoryPoints}★.`
+          : `The ${event.beast} still lives. Its hoard is now ${event.bountyVictoryPoints}★.`,
+      tone: 'blow',
+      weight: 85,
+    };
+  }
+  if (event.type === 'raid-damaged') {
+    return {
+      title: `${event.damage} DAMAGE`,
+      detail: `${actor} wounded the ${event.beast} — ${event.remaining} health left.`,
+      tone: 'blow',
+      weight: 40,
+    };
+  }
+  return null;
+}
+
+function CalloutBanner({
+  callout,
+  reducedMotion,
+  onDone,
+}: {
+  readonly callout: Callout;
+  readonly reducedMotion: boolean;
+  readonly onDone: () => void;
+}) {
+  useEffect(() => {
+    const timer = window.setTimeout(onDone, 2200);
+    return () => window.clearTimeout(timer);
+  }, [callout.key, onDone]);
+  return (
+    <div
+      className={`callout tone-${callout.tone} ${reducedMotion ? 'still' : ''}`}
+      key={callout.key}
+      role="status"
+    >
+      <strong>{callout.title}</strong>
+      <span>{callout.detail}</span>
+    </div>
+  );
 }
 
 function totalScore(state: GameState, player: PlayerState): number {
@@ -205,8 +370,37 @@ function RequirementTokens({
   );
 }
 
-type CollapsiblePanelId =
-  'pressure' | 'quests' | 'cards' | 'forge' | 'preview' | 'log';
+/**
+ * Sidebar tabs, with a predicate for whether a turn can still be spent there.
+ * Keeping this as data means the five buttons stay identical in behaviour and
+ * the "where should I look?" signal is defined in one place.
+ */
+const PANEL_SHORTCUTS: readonly {
+  readonly id: CollapsiblePanelId;
+  readonly label: string;
+  readonly hasAction: (actions: readonly GameAction[]) => boolean;
+}[] = [
+  {
+    id: 'cards',
+    label: 'Cards',
+    hasAction: (actions) =>
+      actions.some(
+        (action) =>
+          action.type === 'play-card' || action.type === 'acquire-card',
+      ),
+  },
+  { id: 'quests', label: 'Quests', hasAction: () => false },
+  {
+    id: 'forge',
+    label: 'Forge',
+    hasAction: (actions) =>
+      actions.some((action) => action.type === 'upgrade-die'),
+  },
+  { id: 'log', label: 'Log', hasAction: () => false },
+  { id: 'pressure', label: 'Pressure', hasAction: () => false },
+];
+
+type CollapsiblePanelId = 'pressure' | 'quests' | 'cards' | 'forge' | 'log';
 
 type ActivePanelId = CollapsiblePanelId;
 
@@ -267,6 +461,126 @@ function CollapsiblePanel({
   );
 }
 
+/**
+ * Makes a location's monster read as a monster. Without this the Elder Dragon
+ * shows only its printed reward — one influence — which hides the raid, its
+ * health, and the bounty that is the whole reason to go there.
+ */
+function EncounterSummary({
+  game,
+  human,
+  location,
+  selectedDie,
+}: {
+  readonly game: GameState;
+  readonly human: PlayerState | undefined;
+  readonly location: GameState['locations'][number];
+  readonly selectedDie: PlayerState['dice'][number] | null;
+}) {
+  const encounter = location.encounter;
+  if (!encounter) return null;
+
+  if (encounter.health === undefined) {
+    return (
+      <div className="encounter-strip hunt">
+        <div className="encounter-title">
+          <strong>⚔ {encounter.beasts.join(' · ')}</strong>
+          <span>Monster hunt</span>
+        </div>
+        <p>
+          Beat a beast&apos;s threat to slay it. Every point over loots +1{' '}
+          {encounter.loot}; a 6 or a masterwork face crits for +
+          {encounter.criticalBonus}★.
+        </p>
+      </div>
+    );
+  }
+
+  const health = encounter.health;
+  const remaining = Math.max(0, health - (game.raidDamage[location.id] ?? 0));
+  const beast = encounter.beasts[0] ?? location.name;
+  if (remaining === 0) {
+    return (
+      <div className="encounter-strip slain">
+        <div className="encounter-title">
+          <strong>☠ {beast} slain</strong>
+          <span>The hoard is claimed</span>
+        </div>
+      </div>
+    );
+  }
+  const incoming = human && selectedDie ? raidDamageFor(human, selectedDie) : 0;
+  const lethal = incoming >= remaining;
+  const survived = game.raidRoundsSurvived?.[location.id] ?? 0;
+  const bounty = raidBountyFor(location, survived);
+  return (
+    <div className={`encounter-strip raid ${lethal ? 'lethal' : ''}`}>
+      <div className="encounter-title">
+        <strong>⚔ {beast}</strong>
+        <span>
+          {remaining}/{health} health · {bounty}★ hoard
+          {survived > 0 ? ` · survived ${survived}` : ''}
+        </span>
+      </div>
+      <div
+        className="encounter-health"
+        role="img"
+        aria-label={`${beast} has ${remaining} of ${health} health remaining`}
+      >
+        <span style={{ width: `${(remaining / health) * 100}%` }} />
+      </div>
+      <p>
+        {incoming > 0
+          ? lethal
+            ? `Your die deals ${incoming} — the KILLING BLOW, claiming ${bounty}★ and the hoard.`
+            : `Your die deals ${incoming}, leaving ${remaining - incoming}. Only the finisher takes the ${bounty}★ bounty.`
+          : `Any die wounds it by its value, doubled on a 6 or masterwork face. The finisher takes ${bounty}★ — and the hoard grows every round it lives.`}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Shows the themed run being built this round and what the next link pays, so
+ * the sequencing decision is visible instead of buried in the rules.
+ */
+function MomentumMeter({ player }: { readonly player: PlayerState }) {
+  const length = player.chain?.length ?? 0;
+  const nextBonus = chainBonusFor(length + 1);
+  const theme = player.chain?.tags[0];
+  return (
+    <section
+      className={`momentum ${length >= 3 ? 'is-hot' : ''}`}
+      aria-label="Momentum"
+    >
+      <div className="momentum-head">
+        <strong>
+          {length === 0 ? 'No run yet' : `${theme ?? 'themed'} run · ${length}`}
+        </strong>
+        <span>
+          {nextBonus > 0
+            ? `Next link +${nextBonus}★`
+            : 'Chain 3 in a theme to score'}
+        </span>
+      </div>
+      <div className="momentum-pips" aria-hidden="true">
+        {[1, 2, 3, 4, 5].map((step) => (
+          <i
+            className={
+              step <= length
+                ? chainBonusFor(step) > 0
+                  ? 'lit scoring'
+                  : 'lit'
+                : ''
+            }
+            key={step}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function LocationDecisionDock({
   game,
   human,
@@ -322,6 +636,29 @@ function LocationDecisionDock({
         )}
       </div>
       <p>{inspectedLocation.description}</p>
+      {human &&
+        (() => {
+          const next = extendChain(human.chain, inspectedLocation.tags);
+          const bonus = chainBonusFor(next.length);
+          const continues = next.length > 1;
+          return (
+            <p
+              className={`chain-hint ${continues ? 'continues' : 'breaks'} ${bonus > 0 ? 'scores' : ''}`}
+            >
+              {continues
+                ? `🔥 Continues your run → ${next.length}${bonus > 0 ? ` for +${bonus}★` : ''}`
+                : (human.chain?.length ?? 0) > 0
+                  ? `Breaks your run and starts a new ${inspectedLocation.tags[0] ?? 'themed'} one`
+                  : `Starts a ${inspectedLocation.tags[0] ?? 'themed'} run`}
+            </p>
+          );
+        })()}
+      <EncounterSummary
+        game={game}
+        human={human}
+        location={inspectedLocation}
+        selectedDie={selectedDie}
+      />
       <div className="decision-dock-reward">
         <span>Reward</span>
         <ResourceList includeVictoryPoints values={inspectedLocation.reward} />
@@ -406,11 +743,13 @@ export function App() {
   // Chosen so Forge Hall opens in round one, keeping the tutorial's Forge step
   // demonstrable on a first run.
   const [seed, setSeed] = useState('shattered-crown-008');
+  const [difficulty, setDifficulty] = useState<CpuDifficulty>('knight');
   const [game, setGame] = useState<GameState | null>(null);
   const [selectedDieId, setSelectedDieId] = useState<DieId | null>(null);
   const [upgradeDieId, setUpgradeDieId] = useState<DieId | null>(null);
   const [upgradeFaceIndex, setUpgradeFaceIndex] = useState(0);
   const [log, setLog] = useState<readonly string[]>([]);
+  const [callout, setCallout] = useState<Callout | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hoveredLocationId, setHoveredLocationId] = useState<LocationId | null>(
     null,
@@ -436,6 +775,22 @@ export function App() {
     () => (game ? enumerateLegalActions(game) : []),
     [game],
   );
+  /** Who is ahead on the real scoring rules, and by how much. */
+  const leader = useMemo(() => {
+    if (!game) return { id: null as PlayerId | null, margin: 0 };
+    const totals = game.players.map((player) => ({
+      id: player.id,
+      score: scoreTotal(game, player.id),
+    }));
+    const sorted = [...totals].sort((left, right) => right.score - left.score);
+    const top = sorted[0];
+    const chaser = sorted[1];
+    if (!top) return { id: null as PlayerId | null, margin: 0 };
+    return {
+      id: top.id,
+      margin: top.score - (chaser?.score ?? top.score),
+    };
+  }, [game]);
   const inspectedLocationId = pinnedLocationId ?? hoveredLocationId;
   const inspectedLocation = game?.locations.find(
     (location) => location.id === inspectedLocationId,
@@ -455,11 +810,9 @@ export function App() {
   };
   const pinLocation = (locationId: LocationId | null) => {
     setPinnedLocationId(locationId);
-    if (locationId) setActivePanel('preview');
   };
   const selectDieForPlanning = (dieId: DieId) => {
     setSelectedDieId(dieId);
-    if (inspectedLocationId) setActivePanel('preview');
   };
   const showPanel = (panel: ActivePanelId) => setActivePanel(panel);
   const pressure = useMemo(() => {
@@ -524,6 +877,11 @@ export function App() {
         ...current,
       ].slice(0, 80),
     );
+    const headline = events
+      .map((event) => calloutFor(event, nextState))
+      .filter((item): item is Callout => item !== null)
+      .sort((left, right) => right.weight - left.weight)[0];
+    if (headline) setCallout({ ...headline, key: nextState.eventSequence });
   };
 
   const startMatch = (guided = false) => {
@@ -628,16 +986,23 @@ export function App() {
     const turnNumber = game.turn.turnNumber;
     const timer = window.setTimeout(() => {
       if (game.id !== matchId || game.turn.turnNumber !== turnNumber) return;
-      const result = applyAction(game, chooseCpuAction(game));
+      const result = applyAction(game, chooseCpuAction(game, difficulty));
       setGame(result.state);
       appendEvents(result.events, result.state);
     }, 220);
     return () => window.clearTimeout(timer);
-  }, [activePlayer?.controller, game]);
+  }, [activePlayer?.controller, difficulty, game]);
 
   const saveMatch = () => {
     if (!game) return;
-    localStorage.setItem(SAVE_KEY, serializeGame(game));
+    localStorage.setItem(
+      SAVE_KEY,
+      JSON.stringify({
+        envelopeVersion: SAVE_ENVELOPE_VERSION,
+        game: JSON.parse(serializeGame(game)),
+        difficulty,
+      } satisfies SavedMatchEnvelope),
+    );
     setError('Match saved locally.');
   };
 
@@ -648,11 +1013,12 @@ export function App() {
       return;
     }
     try {
-      const restored = deserializeGame(saved);
-      setGame(restored);
+      const restored = parseSavedMatch(saved);
+      setGame(restored.game);
+      if (restored.difficulty) setDifficulty(restored.difficulty);
       setSelectedDieId(null);
       setUpgradeDieId(
-        restored.players.find((player) => player.controller === 'human')
+        restored.game.players.find((player) => player.controller === 'human')
           ?.dice[0]?.id ?? null,
       );
       setLog(['Saved match restored.']);
@@ -670,7 +1036,7 @@ export function App() {
     return (
       <main className="setup-shell">
         <section className="setup-card">
-          <p className="eyebrow">Milestone 1 · Headless match prototype</p>
+          <p className="eyebrow">A high-fantasy dice-placement duel</p>
           <h1>Realms of the Shattered Crown</h1>
           <p className="lede">
             Choose a faction, then play a deterministic six-round match against
@@ -710,6 +1076,27 @@ export function App() {
             }
           </p>
           <label>
+            Opponent
+            <select
+              value={difficulty}
+              onChange={(event) =>
+                setDifficulty(event.target.value as CpuDifficulty)
+              }
+            >
+              {CPU_DIFFICULTIES.map((tier) => (
+                <option key={tier.id} value={tier.id}>
+                  {tier.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="ability scoring">
+            {
+              CPU_DIFFICULTIES.find((tier) => tier.id === difficulty)
+                ?.description
+            }
+          </p>
+          <label>
             Match seed
             <input
               value={seed}
@@ -745,7 +1132,7 @@ export function App() {
     <main className="game-shell">
       <header className="game-header" data-tutorial="header">
         <div>
-          <p className="eyebrow">Deterministic debug board</p>
+          <p className="eyebrow">Six rounds to claim the crown</p>
           <h1>Shattered Crown</h1>
         </div>
         <div className="round-block">
@@ -789,7 +1176,7 @@ export function App() {
               className="faction-portrait"
               src={FACTION_PORTRAITS[player.factionId]}
             />
-            <div>
+            <div className="player-identity">
               <strong>{player.name}</strong>
               <span>
                 {
@@ -797,21 +1184,32 @@ export function App() {
                     ?.name
                 }
               </span>
+              {/* Resources are inputs, not goals: icon and count only, with
+                  the full explanation still on hover and for screen readers. */}
+              <div className="resources">
+                {(Object.keys(player.resources) as ResourceType[]).map(
+                  (resource) => (
+                    <ResourceToken
+                      compact
+                      key={resource}
+                      resource={resource}
+                      value={player.resources[resource]}
+                    />
+                  ),
+                )}
+              </div>
             </div>
-            <div className="resources">
-              {(Object.keys(player.resources) as ResourceType[]).map(
-                (resource) => (
-                  <ResourceToken
-                    key={resource}
-                    resource={resource}
-                    value={player.resources[resource]}
-                  />
-                ),
-              )}
-              <ResourceToken
-                resource="victoryPoints"
-                value={player.victoryPoints}
-              />
+            {/* The standing is the loudest thing on screen, because "am I
+                winning?" is the question the old layout could not answer. */}
+            <div className="player-score">
+              <strong>{scoreTotal(game, player.id)}</strong>
+              <span>
+                {leader.margin === 0
+                  ? 'level'
+                  : leader.id === player.id
+                    ? `ahead by ${leader.margin}`
+                    : `behind by ${leader.margin}`}
+              </span>
             </div>
           </article>
         ))}
@@ -855,6 +1253,13 @@ export function App() {
             aria-label="Fantasy board"
             data-tutorial="board"
           >
+            {callout && (
+              <CalloutBanner
+                callout={callout}
+                onDone={() => setCallout(null)}
+                reducedMotion={reducedMotion}
+              />
+            )}
             {human && (
               <BoardRenderer
                 game={game}
@@ -889,7 +1294,6 @@ export function App() {
                 regions are open this round. Click a location to pin its
                 details; select a die to place on glowing routes.
               </span>
-              <span>Board rendered with PixiJS</span>
             </div>
           </section>
 
@@ -944,6 +1348,7 @@ export function App() {
                   );
                 })}
               </div>
+              {human && <MomentumMeter player={human} />}
               <section className="turn-summary" aria-label="Current turn plan">
                 <div>
                   <strong>
@@ -974,74 +1379,34 @@ export function App() {
                   </div>
                 )}
                 <div className="panel-shortcuts" aria-label="Open info panels">
-                  <button
-                    className={
-                      activePanel === 'preview'
-                        ? 'panel-shortcut is-open'
-                        : 'panel-shortcut'
-                    }
-                    disabled={!inspectedLocation}
-                    onClick={() => showPanel('preview')}
-                    type="button"
-                  >
-                    Location
-                  </button>
-                  <button
-                    className={
-                      activePanel === 'cards'
-                        ? 'panel-shortcut is-open'
-                        : 'panel-shortcut'
-                    }
-                    onClick={() => showPanel('cards')}
-                    type="button"
-                  >
-                    Cards
-                  </button>
-                  <button
-                    className={
-                      activePanel === 'quests'
-                        ? 'panel-shortcut is-open'
-                        : 'panel-shortcut'
-                    }
-                    onClick={() => showPanel('quests')}
-                    type="button"
-                  >
-                    Quests
-                  </button>
-                  <button
-                    className={
-                      activePanel === 'forge'
-                        ? 'panel-shortcut is-open'
-                        : 'panel-shortcut'
-                    }
-                    disabled={!forgeUnlocked}
-                    onClick={() => showPanel('forge')}
-                    type="button"
-                  >
-                    Forge
-                  </button>
-                  <button
-                    className={
-                      activePanel === 'log'
-                        ? 'panel-shortcut is-open'
-                        : 'panel-shortcut'
-                    }
-                    onClick={() => showPanel('log')}
-                    type="button"
-                  >
-                    Log
-                  </button>
-                  <button
-                    className={
-                      activePanel === 'pressure'
-                        ? 'panel-shortcut is-open'
-                        : 'panel-shortcut'
-                    }
-                    onClick={() => showPanel('pressure')}
-                    type="button"
-                  >
-                    Pressure
-                  </button>
+                  {PANEL_SHORTCUTS.map((shortcut) => {
+                    // A dot means there is an action waiting behind that tab,
+                    // so the player does not have to open all five to find out
+                    // where their turn can actually be spent.
+                    const waiting =
+                      activePlayer?.controller === 'human' &&
+                      shortcut.hasAction(legalActions);
+                    return (
+                      <button
+                        className={[
+                          'panel-shortcut',
+                          activePanel === shortcut.id ? 'is-open' : '',
+                          waiting ? 'has-action' : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                        disabled={shortcut.id === 'forge' && !forgeUnlocked}
+                        key={shortcut.id}
+                        onClick={() => showPanel(shortcut.id)}
+                        type="button"
+                      >
+                        {shortcut.label}
+                        {waiting && (
+                          <i aria-label="action available" className="dot" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
                 <button
                   className="pass"
@@ -1359,273 +1724,6 @@ export function App() {
                   </div>
                 </CollapsiblePanel>
               )}
-              <CollapsiblePanel
-                className="location-preview"
-                ariaLive="polite"
-                contentId="location-preview-panel"
-                dataTutorial="preview"
-                open={activePanel === 'preview'}
-                summary={
-                  inspectedLocation
-                    ? inspectedLocation.name
-                    : 'Hover or click a location'
-                }
-                title="Location preview"
-                onToggle={() => showPanel('preview')}
-              >
-                {inspectedLocation ? (
-                  <>
-                    <h3>{inspectedLocation.name}</h3>
-                    <p>{inspectedLocation.description}</p>
-                    {inspectedLocation.isActive === false ? (
-                      <p className="sealed-notice">
-                        ⛓ Sealed this round. It will rotate back into the realm
-                        later in the match.
-                      </p>
-                    ) : (
-                      <p className="open-notice">
-                        {
-                          inspectedLocation.slots.filter(
-                            (slot) => slot.isOpen !== false,
-                          ).length
-                        }{' '}
-                        contested slot
-                        {inspectedLocation.slots.filter(
-                          (slot) => slot.isOpen !== false,
-                        ).length === 1
-                          ? ''
-                          : 's'}{' '}
-                        open this round.
-                      </p>
-                    )}
-                    <div className="preview-reward">
-                      <span>Reward</span>
-                      <ResourceList
-                        includeVictoryPoints
-                        values={inspectedLocation.reward}
-                      />
-                    </div>
-                    {inspectedLocation.encounter &&
-                      inspectedLocation.encounter.health === undefined && (
-                        <div className="encounter-banner">
-                          <strong>⚔ Monster Hunt</strong>
-                          <p>
-                            Beat a beast's threat to slay it. Each point over
-                            its threat loots +1{' '}
-                            {inspectedLocation.encounter.loot}, and a natural 6
-                            or masterwork face lands a critical strike for +
-                            {inspectedLocation.encounter.criticalBonus}★.
-                          </p>
-                        </div>
-                      )}
-                    {inspectedLocation.encounter?.health !== undefined &&
-                      (() => {
-                        const encounter = inspectedLocation.encounter;
-                        const health = encounter.health ?? 0;
-                        const remaining = Math.max(
-                          0,
-                          health - (game.raidDamage[inspectedLocation.id] ?? 0),
-                        );
-                        return (
-                          <div className="encounter-banner raid">
-                            <strong>
-                              {remaining === 0
-                                ? `☠ ${encounter.beasts[0]} slain`
-                                : `⚔ Raid · ${encounter.beasts[0]}`}
-                            </strong>
-                            {remaining > 0 ? (
-                              <>
-                                <div
-                                  aria-label={`${remaining} of ${health} health remaining`}
-                                  className="raid-bar"
-                                  role="img"
-                                >
-                                  <span
-                                    style={{
-                                      width: `${(remaining / health) * 100}%`,
-                                    }}
-                                  />
-                                </div>
-                                <p>
-                                  <strong className="raid-health">
-                                    {remaining}/{health} health
-                                  </strong>{' '}
-                                  — each die dealt here damages the beast by its
-                                  value, doubled on a natural 6 or masterwork
-                                  face. The finishing blow claims{' '}
-                                  {encounter.bounty?.victoryPoints ?? 0}★ and
-                                  the hoard.
-                                </p>
-                              </>
-                            ) : (
-                              <p>
-                                The hoard is claimed. This road is an ordinary
-                                passage now.
-                              </p>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    <ul className="preview-slots">
-                      {inspectedLocation.slots.map((slot, index) => {
-                        const encounter = inspectedLocation.encounter;
-                        const isRaid = encounter?.health !== undefined;
-                        const placement: GameAction | null =
-                          selectedDieId && human
-                            ? {
-                                type: 'place-die',
-                                playerId: human.id,
-                                dieId: selectedDieId,
-                                locationId: inspectedLocation.id,
-                                slotId: slot.id,
-                              }
-                            : null;
-                        let validation = placement
-                          ? validateAction(game, placement)
-                          : null;
-                        // An enemy-held slot can still be contested by force.
-                        let isBump = false;
-                        if (
-                          validation &&
-                          !validation.legal &&
-                          selectedDieId &&
-                          human &&
-                          slot.occupantDieId !== null &&
-                          slot.occupantPlayerId !== human.id
-                        ) {
-                          const bump = validateAction(game, {
-                            type: 'bump-die',
-                            playerId: human.id,
-                            dieId: selectedDieId,
-                            locationId: inspectedLocation.id,
-                            slotId: slot.id,
-                          });
-                          if (bump.legal) {
-                            validation = bump;
-                            isBump = true;
-                          }
-                        }
-                        const beast = isRaid
-                          ? (encounter?.beasts[0] ?? null)
-                          : (encounter?.beasts[index] ?? null);
-                        const face =
-                          selectedDie?.rolledFaceIndex == null
-                            ? null
-                            : selectedDie.faces[selectedDie.rolledFaceIndex];
-                        let outcome: string | null = null;
-                        if (
-                          encounter &&
-                          selectedDie &&
-                          face &&
-                          validation?.legal
-                        ) {
-                          const value = dieValue(selectedDie);
-                          const critical =
-                            value >= 6 || face.symbols.includes('masterwork');
-                          if (isRaid) {
-                            const health = encounter.health ?? 0;
-                            const remaining = Math.max(
-                              0,
-                              health -
-                                (game.raidDamage[inspectedLocation.id] ?? 0),
-                            );
-                            // Ask the engine, so the preview can never drift
-                            // from the damage the rules actually apply.
-                            const damage = human
-                              ? raidDamageFor(human, selectedDie)
-                              : value;
-                            outcome =
-                              remaining === 0
-                                ? null
-                                : damage >= remaining
-                                  ? `KILLING BLOW · ${damage} damage · claims ${encounter.bounty?.victoryPoints ?? 0}★ and the hoard`
-                                  : `${damage} damage${critical ? ' (CRITICAL ×2)' : ''} · ${remaining - damage} health left`;
-                          } else {
-                            const reduction =
-                              human?.factionAbilityId ===
-                                'verdant-adaptation' &&
-                              selectedDie.affinity === 'nature'
-                                ? 1
-                                : 0;
-                            const threat = Math.max(
-                              1,
-                              (slot.requirement.minimumValue ?? 1) - reduction,
-                            );
-                            const overkill = Math.max(0, value - threat);
-                            outcome = `Slay ${beast}${
-                              overkill > 0
-                                ? ` · +${overkill} ${encounter.loot}`
-                                : ''
-                            }${
-                              critical
-                                ? ` · CRITICAL +${encounter.criticalBonus}★`
-                                : ''
-                            }`;
-                          }
-                        }
-                        return (
-                          <li
-                            className={
-                              validation
-                                ? validation.legal
-                                  ? isBump
-                                    ? 'slot-preview bumpable'
-                                    : 'slot-preview legal'
-                                  : 'slot-preview blocked'
-                                : 'slot-preview'
-                            }
-                            key={slot.id}
-                          >
-                            <strong>
-                              {validation
-                                ? validation.legal
-                                  ? isBump
-                                    ? '⚡ BUMP'
-                                    : '✓ PLAYABLE'
-                                  : '× BLOCKED'
-                                : `SLOT ${index + 1}`}
-                            </strong>
-                            {beast && !isRaid && (
-                              <span className="beast-tag">⚔ {beast}</span>
-                            )}
-                            <span>
-                              <RequirementTokens
-                                requirement={slot.requirement}
-                              />
-                            </span>
-                            {isBump && (
-                              <em className="bump-projection">
-                                Drive off the rival die — costs 1{' '}
-                                {human?.factionAbilityId === 'arcane-resonance'
-                                  ? 'mana'
-                                  : 'influence'}{' '}
-                                and returns their die to them ready.
-                              </em>
-                            )}
-                            {outcome ? (
-                              <em className="slay-projection">{outcome}</em>
-                            ) : (
-                              !isBump &&
-                              validation && (
-                                <em>
-                                  {validation.legal
-                                    ? 'Legal placement'
-                                    : validation.message}
-                                </em>
-                              )
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </>
-                ) : (
-                  <p>
-                    Hover or click a location to inspect its reward and
-                    restrictions.
-                  </p>
-                )}
-              </CollapsiblePanel>
               {selectedDieId && human && (
                 <details className="accessible-actions">
                   <summary>Keyboard placement options</summary>

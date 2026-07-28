@@ -3,11 +3,16 @@ export type { RandomSnapshot } from './random/seeded-random.js';
 export {
   applyAction,
   bumpCostFor,
+  chainBonusFor,
   createGame,
+  extendChain,
   deserializeGame,
   dieValue,
   enumerateLegalActions,
+  raidBountyFor,
   raidDamageFor,
+  scorePlayer,
+  scoreTotal,
   serializeGame,
   validateAction,
 } from './match.js';

@@ -23,7 +23,7 @@ Implemented two-player setup, four initial factions, five dice per player, twelv
 
 ## Milestone 3 — Cards and dice upgrades
 
-**Status:** complete as a playable systems layer. Four starting cards and a deeper market use typed deterministic effects; the market replenishes from a seeded deck; hands and card actions are playable in the browser; twelve Forge-gated upgrades permanently replace die faces with resource, dual-symbol, or masterwork symbols; upgrade costs, previews, scoring, saves, collapsible panels, CPU evaluation, a replayable visual tutorial, and deterministic player-count-scaled board scarcity are integrated.
+**Status:** complete as a playable systems layer. Four starting cards and a deeper market use typed deterministic effects; the market replenishes from a seeded deck; hands and card actions are playable in the browser; twelve Forge-gated upgrades permanently replace die faces with resource, dual-symbol, or masterwork symbols; upgrade costs, previews, scoring, saves, a command-drawer sidebar, CPU evaluation, a replayable visual tutorial, and deterministic player-count-scaled board scarcity are integrated.
 
 ## Milestone 4 — Content and polish
 
@@ -35,6 +35,17 @@ Implemented two-player setup, four initial factions, five dice per player, twelv
 - **Crown quests**: three seeded, first-come shared objectives with typed conditions.
 
 All four faction identities are also complete, each with a distinct grip on these systems, and the fifteen-step tutorial now teaches panel management, hunts, the raid, bumping, card engines, expanded Forge upgrades, and quests. The market has grown to twenty-six cards, including empower, siege, steal, trophy, forged-face, and tag-payoff effects that reach into combat, rivalry, and long-term engines rather than only granting income. The Forge shop has grown to twelve permanent faces, including dual-symbol and masterwork lines. State moved to schema v4 (shared objectives and raid damage). Remaining: audio placeholders, deeper AI personality, end-game scoring presentation, and more late-game content.
+
+## Milestone 5 — Making it felt
+
+**Status:** in progress. Playtesting showed the systems were present but imperceptible, so this milestone is about tension and legibility rather than new rules:
+
+- **Momentum runs** make placements interlock, so the order dice are committed in is the decision rather than each turn being an isolated best-slot pick.
+- **The dragon's wrath** gives a raid boss its own turn: its hoard grows every round it survives and it regenerates in rounds nobody wounds it, which puts a clock on the match.
+- **Moment callouts** promote one headline per batch of events over the board, so a critical strike no longer reads like a resource tick.
+- **Opponent difficulty** (Squire / Knight / Warlord) with a top tier that weighs what each square is worth to _you_, verified to differ in real strength.
+
+Remaining: compact card/market rows, tactile Forge before/after previews, richer end-of-match scoring presentation, refreshed art/audio feedback, and broader user-facing playtests around whether momentum and dragon wrath are legible without reading the log.
 
 ## Deferred
 
