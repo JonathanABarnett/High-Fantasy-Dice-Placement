@@ -6,6 +6,7 @@ export type GameIconName =
   | 'knowledge'
   | 'mana'
   | 'martial'
+  | 'masterwork'
   | 'materials'
   | 'nature'
   | 'neutral'
@@ -52,6 +53,14 @@ export function GameIcon({ name }: { readonly name: GameIconName }) {
           <path d="m7.4 15.6 8.7-8.7 2.4 2.4-8.7 8.7a2 2 0 0 1-2.8 0 1.7 1.7 0 0 1 .4-2.4Z" />
           <path d="m14.8 4.5 4.7 4.7M6.2 6.2l2.5-2.5 2.8 2.8-2.5 2.5L6.2 6.2Z" />
           <path d="m9.6 8.5 2.3 2.3" />
+        </svg>
+      );
+    case 'masterwork':
+      return (
+        <svg {...COMMON_ICON_PROPS} className="game-icon" data-icon={name}>
+          <path d="m12 2.8 2.1 4.8 5.2.5-3.9 3.4 1.2 5.1-4.6-2.7-4.6 2.7 1.2-5.1-3.9-3.4 5.2-.5L12 2.8Z" />
+          <path d="M12 13.9v7.3M8.7 18.1h6.6" />
+          <path d="m8.4 5.8 1 2M15.6 5.8l-1 2" />
         </svg>
       );
     case 'influence':

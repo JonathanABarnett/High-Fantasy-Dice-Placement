@@ -34,6 +34,7 @@ import {
 } from '@shattered-crown/game-engine';
 import type {
   CardCategory,
+  DieFace,
   DieId,
   FactionId,
   PlayerId,
@@ -54,7 +55,7 @@ import {
   ResourceToken,
 } from './components/RulesToken';
 import { GameIcon } from './components/GameIcon';
-import { AFFINITY_INFO } from './components/rules-info';
+import { AFFINITY_INFO, RESOURCE_INFO } from './components/rules-info';
 import { useInterfaceStore } from './stores/interface-store';
 import { TutorialOverlay } from './tutorial/TutorialOverlay';
 import allyCardArt from '../../../assets/generated/cards/category-ally-v1.webp';
@@ -391,6 +392,77 @@ function RequirementTokens({
         </>
       )}
     </span>
+  );
+}
+
+function symbolIcon(symbol: string) {
+  if (symbol === 'masterwork') return 'masterwork';
+  return RESOURCE_INFO[symbol as ResourceType]?.icon ?? 'neutral';
+}
+
+function symbolLabel(symbol: string): string {
+  if (symbol === 'masterwork') return 'Masterwork';
+  return RESOURCE_INFO[symbol as ResourceType]?.label ?? symbol;
+}
+
+function DieFacePreview({
+  face,
+  label,
+  tone = 'plain',
+}: {
+  readonly face: DieFace;
+  readonly label: string;
+  readonly tone?: 'plain' | 'upgrade' | 'current';
+}) {
+  return (
+    <span className={`face-preview face-preview-${tone}`}>
+      <span className="face-preview-label">{label}</span>
+      <span className="face-preview-die">
+        <strong>{face.value}</strong>
+        <span className="face-preview-symbols">
+          {face.symbols.length ? (
+            face.symbols.map((symbol, index) => (
+              <span
+                aria-label={symbolLabel(symbol)}
+                className={`face-symbol face-symbol-${symbol}`}
+                data-tooltip={symbolLabel(symbol)}
+                key={`${symbol}-${index}`}
+                tabIndex={0}
+              >
+                <GameIcon name={symbolIcon(symbol)} />
+              </span>
+            ))
+          ) : (
+            <span className="face-empty">Base</span>
+          )}
+        </span>
+      </span>
+    </span>
+  );
+}
+
+function ForgeFacePreview({
+  currentFace,
+  replacement,
+}: {
+  readonly currentFace: DieFace | undefined;
+  readonly replacement: DieFace;
+}) {
+  return (
+    <div className="forge-face-preview" aria-label="Forge face preview">
+      {currentFace ? (
+        <DieFacePreview face={currentFace} label="Replace" tone="current" />
+      ) : (
+        <span className="face-preview face-preview-current">
+          <span className="face-preview-label">Replace</span>
+          <span className="face-preview-die missing">Choose die</span>
+        </span>
+      )}
+      <span aria-hidden="true" className="forge-arrow">
+        →
+      </span>
+      <DieFacePreview face={replacement} label="Forge" tone="upgrade" />
+    </div>
   );
 }
 
@@ -1715,6 +1787,9 @@ export function App() {
                   </div>
                   <div className="upgrade-list">
                     {game.upgrades.map((upgrade) => {
+                      const currentFace =
+                        human.dice.find((die) => die.id === upgradeDieId)
+                          ?.faces[upgradeFaceIndex] ?? human.dice[0]?.faces[0];
                       const action: GameAction | null = upgradeDieId
                         ? {
                             type: 'upgrade-die',
@@ -1729,6 +1804,10 @@ export function App() {
                         : false;
                       return (
                         <article className="upgrade" key={upgrade.id}>
+                          <ForgeFacePreview
+                            currentFace={currentFace}
+                            replacement={upgrade.replacement}
+                          />
                           <div>
                             <strong>{upgrade.name}</strong>
                             <p>{upgrade.description}</p>

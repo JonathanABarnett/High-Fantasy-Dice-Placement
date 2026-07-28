@@ -1025,12 +1025,18 @@ select {
 .game-card,
 .upgrade {
   display: grid;
-  grid-template-columns: 1fr auto;
   gap: 0.15rem 0.55rem;
   padding: 0.55rem;
   border: 1px solid #4f402e;
   border-radius: 0.4rem;
   background: linear-gradient(135deg, #211a15, #12110f);
+}
+.game-card {
+  grid-template-columns: 1fr auto;
+}
+.upgrade {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
 }
 .game-card {
   position: relative;
@@ -1079,24 +1085,153 @@ select {
 }
 .game-card p,
 .upgrade p {
-  grid-column: 1;
   margin: 0.1rem 0;
   color: #aa9d89;
   font-size: 0.65rem;
   line-height: 1.35;
 }
+.game-card p {
+  grid-column: 1;
+}
+.upgrade p {
+  grid-column: 2;
+}
 .game-card button,
 .upgrade button {
-  grid-column: 2;
   align-self: stretch;
   padding: 0.35rem 0.55rem;
   font-size: 0.64rem;
+}
+.game-card button {
+  grid-column: 2;
+}
+.upgrade button {
+  grid-column: 3;
 }
 .game-card button {
   grid-row: 2 / span 4;
 }
 .upgrade button {
   grid-row: 1 / span 4;
+}
+.forge-face-preview {
+  grid-row: 1 / span 4;
+  display: grid;
+  grid-template-columns: auto auto auto;
+  gap: 0.25rem;
+  align-items: center;
+  padding: 0.25rem;
+  border: 1px solid rgb(229 184 97 / 22%);
+  border-radius: 0.45rem;
+  background: rgb(10 9 8 / 42%);
+}
+.face-preview {
+  display: grid;
+  gap: 0.18rem;
+  justify-items: center;
+}
+.face-preview-label {
+  color: #8f826e;
+  font-size: 0.48rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.face-preview-die {
+  position: relative;
+  display: grid;
+  width: 2.75rem;
+  aspect-ratio: 1;
+  padding: 0.22rem;
+  border: 2px solid #5c4930;
+  border-radius: 0.45rem;
+  color: #efe2c3;
+  background:
+    radial-gradient(circle at 30% 28%, rgb(255 255 255 / 16%), transparent 28%),
+    linear-gradient(145deg, #35291f, #11100f);
+  box-shadow:
+    inset 0.12rem 0.12rem 0 rgb(255 255 255 / 7%),
+    inset -0.12rem -0.12rem 0 rgb(0 0 0 / 38%);
+}
+.face-preview-die strong {
+  align-self: start;
+  justify-self: start;
+  color: #fff1cc;
+  font:
+    900 1.05rem Georgia,
+    serif;
+}
+.face-preview-die.missing {
+  place-content: center;
+  color: #978b78;
+  font-size: 0.55rem;
+  font-weight: 800;
+  text-align: center;
+}
+.face-preview-current .face-preview-die {
+  border-color: #5b5246;
+  opacity: 0.75;
+  filter: grayscale(0.35);
+}
+.face-preview-upgrade .face-preview-die {
+  border-color: #d3a85b;
+  background:
+    radial-gradient(circle at 28% 25%, rgb(255 236 177 / 20%), transparent 30%),
+    linear-gradient(145deg, #5d3b16, #17110d);
+  box-shadow:
+    0 0 0 1px rgb(255 215 129 / 24%),
+    0 0 1rem rgb(205 143 55 / 18%),
+    inset 0.12rem 0.12rem 0 rgb(255 255 255 / 9%),
+    inset -0.12rem -0.12rem 0 rgb(0 0 0 / 34%);
+}
+.face-preview-symbols {
+  display: flex;
+  gap: 0.1rem;
+  align-self: end;
+  justify-self: end;
+}
+.face-symbol {
+  position: relative;
+  display: inline-grid;
+  width: 0.95rem;
+  aspect-ratio: 1;
+  color: #f1c66f;
+  place-items: center;
+}
+.face-symbol .game-icon {
+  stroke-width: 2;
+  filter: drop-shadow(0 0 0.3rem rgb(0 0 0 / 70%));
+}
+.face-symbol-gold {
+  color: #f4be42;
+}
+.face-symbol-mana {
+  color: #56b8ff;
+}
+.face-symbol-knowledge {
+  color: #e9dfc2;
+}
+.face-symbol-materials {
+  color: #d69058;
+}
+.face-symbol-influence {
+  color: #d57af1;
+}
+.face-symbol-masterwork {
+  color: #ffe38a;
+}
+.face-empty {
+  align-self: end;
+  color: #9b8e78;
+  font-size: 0.48rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.forge-arrow {
+  color: #d3a85b;
+  font-size: 1rem;
+  font-weight: 900;
 }
 .hand-card {
   border-left: 3px solid #704e9c;
