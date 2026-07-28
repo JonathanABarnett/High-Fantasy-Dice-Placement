@@ -301,8 +301,38 @@ select {
   width: 1.05rem;
   aspect-ratio: 1;
   place-items: center;
-  font-family: Georgia, serif;
-  font-weight: 900;
+}
+.game-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: rgb(255 255 255 / 10%);
+  stroke: currentcolor;
+  stroke-width: 1.65;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.game-icon circle,
+.game-icon rect {
+  fill: rgb(255 255 255 / 8%);
+}
+.game-icon[data-icon='gold'],
+.game-icon[data-icon='victoryPoints'],
+.game-icon[data-icon='mana'],
+.game-icon[data-icon='relic'] {
+  fill: currentcolor;
+  fill-opacity: 0.18;
+}
+.game-icon[data-icon='tactic'] {
+  fill: currentcolor;
+  fill-opacity: 0.22;
+}
+.game-icon[data-icon='ally'],
+.game-icon[data-icon='nature'],
+.game-icon[data-icon='neutral'] {
+  fill: currentcolor;
+  fill-opacity: 0.12;
 }
 .info-token strong {
   color: #fff0ca;
@@ -343,6 +373,15 @@ select {
 }
 .value-token .token-icon {
   color: #f1c66f;
+}
+.category-tactic .token-icon {
+  color: #f1a24d;
+}
+.category-ally .token-icon {
+  color: #8ad9ff;
+}
+.category-relic .token-icon {
+  color: #d37cff;
 }
 .compact-token {
   padding: 0.15rem 0.28rem;
@@ -720,9 +759,15 @@ select {
   text-overflow: ellipsis;
 }
 .die-glyph {
+  display: inline-grid;
+  width: 1.35rem;
+  aspect-ratio: 1;
   align-self: center;
   color: #d7b36f;
-  font-size: 0.82rem;
+  place-items: center;
+}
+.die-glyph .game-icon {
+  filter: drop-shadow(0 0 0.35rem currentcolor);
 }
 .die-arcane {
   border-color: #597fc9;

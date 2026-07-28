@@ -5,6 +5,7 @@ import type {
   ResourceType,
 } from '@shattered-crown/shared-types';
 
+import { GameIcon } from './GameIcon';
 import { AFFINITY_INFO, CATEGORY_INFO, RESOURCE_INFO } from './rules-info';
 
 interface ResourceTokenProps {
@@ -27,7 +28,7 @@ export function ResourceToken({
       tabIndex={0}
     >
       <span aria-hidden="true" className="token-icon">
-        {info.icon}
+        <GameIcon name={info.icon} />
       </span>
       {!compact && <span className="token-label">{info.label}</span>}
       {value !== undefined && <strong>{value}</strong>}
@@ -79,7 +80,10 @@ export function CategoryToken({
       data-tooltip={`${info.label}: ${info.description}`}
       tabIndex={0}
     >
-      <span aria-hidden="true">{info.icon}</span> {info.label}
+      <span aria-hidden="true" className="token-icon">
+        <GameIcon name={info.icon} />
+      </span>
+      {info.label}
     </span>
   );
 }
@@ -100,7 +104,7 @@ export function AffinityToken({
       tabIndex={0}
     >
       <span aria-hidden="true" className="token-icon">
-        {info.icon}
+        <GameIcon name={info.icon} />
       </span>
       {!compact && <span className="token-label">{info.label}</span>}
     </span>

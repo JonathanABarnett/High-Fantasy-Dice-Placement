@@ -70,19 +70,19 @@ const REGION_COLORS: Readonly<Record<string, number>> = {
 };
 
 const AFFINITY_GLYPHS: Readonly<Record<string, string>> = {
-  arcane: '✦',
-  martial: '⚔',
-  nature: '❧',
-  influence: '♜',
-  neutral: '◇',
+  arcane: 'ARC',
+  martial: 'MAR',
+  nature: 'NAT',
+  influence: 'INF',
+  neutral: 'ANY',
 };
 
 const RESOURCE_GLYPHS: Readonly<Record<string, string>> = {
-  gold: '●',
-  mana: '◆',
-  knowledge: '▤',
-  materials: '⚒',
-  influence: '♜',
+  gold: 'GLD',
+  mana: 'MNA',
+  knowledge: 'KNO',
+  materials: 'MAT',
+  influence: 'INF',
   victoryPoints: '★',
 };
 

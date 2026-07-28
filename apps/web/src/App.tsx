@@ -53,6 +53,7 @@ import {
   ResourceList,
   ResourceToken,
 } from './components/RulesToken';
+import { GameIcon } from './components/GameIcon';
 import { AFFINITY_INFO } from './components/rules-info';
 import { useInterfaceStore } from './stores/interface-store';
 import { TutorialOverlay } from './tutorial/TutorialOverlay';
@@ -375,7 +376,7 @@ function RequirementTokens({
           tabIndex={0}
         >
           <span aria-hidden="true" className="token-icon">
-            ⚄
+            <GameIcon name="value" />
           </span>
           <strong>{requirement.minimumValue}+</strong>
         </span>
@@ -1371,7 +1372,7 @@ export function App() {
                       type="button"
                     >
                       <span aria-hidden="true" className="die-glyph">
-                        {affinity.icon}
+                        <GameIcon name={affinity.icon} />
                       </span>
                       <strong>{value}</strong>
                       {boost > 0 && <span className="die-boost">+{boost}</span>}
@@ -1385,7 +1386,7 @@ export function App() {
                 <div>
                   <strong>
                     {selectedDie
-                      ? `${AFFINITY_INFO[selectedDie.affinity].icon} Value ${dieValue(selectedDie)} ${AFFINITY_INFO[selectedDie.affinity].label}`
+                      ? `Value ${dieValue(selectedDie)} ${AFFINITY_INFO[selectedDie.affinity].label}`
                       : activePlayer?.controller === 'human'
                         ? 'Choose a die or card'
                         : 'CPU is planning'}
