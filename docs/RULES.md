@@ -34,6 +34,12 @@ At least one live monster hunt is guaranteed to be open every round. If the roun
 
 Dragon Pass is a persistent raid. The Elder Dragon has a shared pool of 20 health that carries across rounds and is visible on the board and in the location preview. Any die placed at either slot wounds it by the die's rolled value, doubled by a natural six or a masterwork face. Wounds from both players accumulate into the same pool, so a rival can chip the beast down while you wait for a big die — but the player who lands the blow that empties the pool takes the entire bounty: 6 victory points and 3 gold from the hoard. Once slain, the pass reverts to an ordinary location for the rest of the match, and it no longer satisfies the guaranteed-hunt rule.
 
+## The dragon's wrath
+
+A raid boss takes its own turn. At the end of every round it survives, its hoard grows by 2 victory points, so the longer the Elder Dragon lives the richer the killing blow becomes — as high as 16 points in a long match. If nobody wounded it that round it also claws back 5 health, so leaving it alone costs real ground rather than merely postponing the fight. The board itself is unchanged by this, which keeps placement scarcity and low-roll routes exactly as they were.
+
+The result is a clock: engage the beast and the prize is smaller but reachable, or let it grow and gamble that you, not your rival, will land the finishing blow.
+
 ## Bumping
 
 A slot already held by a rival can be contested. Placing a die there with a strictly higher rolled value than the defending die, and paying one influence on top of any slot cost, drives the rival off and claims the slot and its reward. The bumped die returns to its owner ready to be placed again, so bumping costs tempo and influence rather than destroying a die outright. Because each bump requires a strictly higher value, exchanges terminate rather than looping.
@@ -69,6 +75,10 @@ Each faction pulls on a different part of the game, so the same board rewards th
 - **Stonebound League:** placement at Forge Hall gains 1 extra material, and rivals must pay 1 extra influence to bump a Stonebound die.
 
 Each faction also begins with its own executable starting tactic.
+
+## Opponent difficulty
+
+Three CPU tiers are selectable at setup. A **Squire** sees the board but picks from its merely-good moves rather than its best. A **Knight** always takes the strongest move it can find. A **Warlord** additionally weighs what each square is worth to _you_ — counting which of your ready dice could use a slot and how rich the location is — and will take a slightly weaker square to shut you out of a strong one. The tiers are verified to differ in actual strength, not just in label.
 
 ## CPU
 

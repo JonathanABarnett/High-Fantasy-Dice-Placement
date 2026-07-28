@@ -9,6 +9,7 @@ export {
   deserializeGame,
   dieValue,
   enumerateLegalActions,
+  raidBountyFor,
   raidDamageFor,
   serializeGame,
   validateAction,

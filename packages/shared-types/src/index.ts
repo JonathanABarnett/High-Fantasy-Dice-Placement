@@ -280,6 +280,14 @@ export interface GameState {
   readonly objectives: readonly ClaimableObjective[];
   /** Accumulated damage on persistent raid bosses, keyed by location id. */
   readonly raidDamage: Readonly<Record<string, number>>;
+  /**
+   * Rounds each raid boss has survived, keyed by location id. A surviving
+   * beast grows its hoard, so the longer it lives the richer the kill — and it
+   * regenerates in any round nobody wounds it, so ignoring it costs ground.
+   */
+  readonly raidRoundsSurvived?: Readonly<Record<string, number>>;
+  /** Raid damage as of this round's start, used to detect an ignored beast. */
+  readonly raidDamageAtRoundStart?: Readonly<Record<string, number>>;
   readonly round: RoundState;
   readonly turn: TurnState;
   readonly eventSequence: number;
@@ -450,6 +458,19 @@ export type GameEvent =
       readonly tag: string;
       readonly length: number;
       readonly bonusVictoryPoints: number;
+    }
+  | {
+      readonly type: 'raid-enraged';
+      readonly sequence: number;
+      readonly locationId: LocationId;
+      readonly beast: string;
+      /** Health clawed back because nobody wounded it this round. */
+      readonly regenerated: number;
+      readonly remaining: number;
+      readonly health: number;
+      /** The hoard it has hoarded by surviving, in victory points. */
+      readonly bountyVictoryPoints: number;
+      readonly roundsSurvived: number;
     };
 
 export interface ScoreBreakdown {

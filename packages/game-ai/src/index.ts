@@ -4,13 +4,16 @@ import {
   dieValue,
   enumerateLegalActions,
   extendChain,
+  raidBountyFor,
   raidDamageFor,
   SeededRandom,
 } from '@shattered-crown/game-engine';
 import type {
   GameAction,
   GameState,
+  PlayerId,
   ResourceType,
+  SlotId,
 } from '@shattered-crown/shared-types';
 
 const RESOURCE_VALUES: Readonly<Record<ResourceType, number>> = {
@@ -25,6 +28,35 @@ export interface EvaluatedAction {
   readonly action: GameAction;
   readonly score: number;
 }
+
+/**
+ * How hard the CPU plays. Squire deliberately settles for good-not-best moves,
+ * Knight takes the best move it can see, and Warlord additionally weighs what
+ * each square is worth to its rival.
+ */
+export type CpuDifficulty = 'squire' | 'knight' | 'warlord';
+
+export const CPU_DIFFICULTIES: readonly {
+  readonly id: CpuDifficulty;
+  readonly label: string;
+  readonly description: string;
+}[] = [
+  {
+    id: 'squire',
+    label: 'Squire',
+    description: 'Plays reasonably but often settles for a weaker square.',
+  },
+  {
+    id: 'knight',
+    label: 'Knight',
+    description: 'Always takes the best move it can see.',
+  },
+  {
+    id: 'warlord',
+    label: 'Warlord',
+    description: 'Plays to win and to deny — it will take squares you wanted.',
+  },
+];
 
 /**
  * Victory points this action would immediately claim from shared objectives.
@@ -47,8 +79,43 @@ function objectiveClaimValue(state: GameState, action: GameAction): number {
   }
 }
 
+/**
+ * How badly a rival wants this square. Approximated from the rivals' ready
+ * dice: a slot several of them could use, at a location paying victory points
+ * or guarding a monster, is worth taking off the board.
+ */
+function denialValue(
+  state: GameState,
+  actingPlayerId: PlayerId,
+  location: GameState['locations'][number],
+  slotId: SlotId,
+): number {
+  const slot = location.slots.find((item) => item.id === slotId);
+  if (!slot) return 0;
+  const minimum = slot.requirement.minimumValue ?? 1;
+  let contenders = 0;
+  for (const rival of state.players) {
+    if (rival.id === actingPlayerId) continue;
+    for (const die of rival.dice) {
+      if (die.status !== 'ready') continue;
+      if (dieValue(die) < minimum) continue;
+      if (
+        slot.requirement.affinities &&
+        !slot.requirement.affinities.includes(die.affinity)
+      )
+        continue;
+      contenders += 1;
+    }
+  }
+  if (contenders === 0) return 0;
+  const prize =
+    (location.reward.victoryPoints ?? 0) * 1.5 + (location.encounter ? 2 : 0);
+  return Math.min(3, contenders * 0.35) + prize * 0.3;
+}
+
 export function evaluateCpuActions(
   state: GameState,
+  difficulty: CpuDifficulty = 'knight',
 ): readonly EvaluatedAction[] {
   const player = state.players.find(
     (item) => item.id === state.turn.activePlayerId,
@@ -231,7 +298,11 @@ export function evaluateCpuActions(
           if (damage >= remaining) {
             const bountyLoot = Object.entries(encounter.bounty?.loot ?? {});
             score +=
-              (encounter.bounty?.victoryPoints ?? 0) * 3 +
+              raidBountyFor(
+                location,
+                state.raidRoundsSurvived?.[location.id] ?? 0,
+              ) *
+                3 +
               bountyLoot.reduce(
                 (total, [resource, amount]) =>
                   total +
@@ -264,6 +335,14 @@ export function evaluateCpuActions(
     if (action.type === 'bump-die') {
       score -= 1.6 + RESOURCE_VALUES.influence;
     }
+
+    // A Warlord also asks what the slot is worth to its rival, and will take a
+    // slightly weaker square to shut a rival out of a strong one. This is what
+    // turns the CPU from an optimiser into an opponent.
+    if (difficulty === 'warlord') {
+      score += denialValue(state, player.id, location, action.slotId) * 0.8;
+    }
+
     score -= faceValue * 0.04;
     return { action, score };
   };
@@ -279,14 +358,28 @@ export function evaluateCpuActions(
   });
 }
 
-export function chooseCpuAction(state: GameState): GameAction {
-  const evaluated = evaluateCpuActions(state);
+export function chooseCpuAction(
+  state: GameState,
+  difficulty: CpuDifficulty = 'knight',
+): GameAction {
+  const evaluated = evaluateCpuActions(state, difficulty);
   if (evaluated.length === 0)
     throw new Error('The active player is not a CPU with legal actions.');
-  const bestScore = Math.max(...evaluated.map((item) => item.score));
-  const best = evaluated.filter((item) => item.score === bestScore);
   const random = new SeededRandom(
     (state.rngState ^ state.turn.turnNumber) >>> 0,
   );
+  const bestScore = Math.max(...evaluated.map((item) => item.score));
+  if (difficulty === 'squire') {
+    // A Squire sees the board but not the sharpest line: it picks from the
+    // merely-good moves, which reads as a beatable opponent rather than a
+    // random one.
+    const passes = evaluated.filter((item) => item.action.type === 'pass');
+    const playable = evaluated.filter((item) => item.action.type !== 'pass');
+    const pool = playable.length > 0 ? playable : passes;
+    const ranked = [...pool].sort((left, right) => right.score - left.score);
+    const window = Math.max(1, Math.ceil(ranked.length / 2));
+    return random.pick(ranked.slice(0, window)).action;
+  }
+  const best = evaluated.filter((item) => item.score === bestScore);
   return random.pick(best).action;
 }

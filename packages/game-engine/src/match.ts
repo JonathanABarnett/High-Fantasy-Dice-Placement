@@ -72,6 +72,24 @@ export function chainBonusFor(length: number): number {
   return 0;
 }
 
+/** Health a raid boss claws back in a round where nobody wounded it. */
+const RAID_REGENERATION = 5;
+/** Victory points added to a raid boss's hoard for each round it survives. */
+const RAID_HOARD_GROWTH = 2;
+
+/**
+ * What the killing blow on this raid is currently worth. The hoard swells for
+ * every round the beast survives, so a dragon left alone becomes both harder
+ * to finish and richer to finish — the reason to engage it grows with the risk.
+ */
+export function raidBountyFor(
+  location: BoardLocation,
+  roundsSurvived: number,
+): number {
+  const base = location.encounter?.bounty?.victoryPoints ?? 0;
+  return base + roundsSurvived * RAID_HOARD_GROWTH;
+}
+
 /** The run a placement at these tags would produce, given the current run. */
 export function extendChain(
   chain: ChainState | undefined,
@@ -484,6 +502,8 @@ export function createGame(options: CreateGameOptions): TransitionResult {
       upgrades: options.content.upgrades ?? [],
       objectives,
       raidDamage: {},
+      raidRoundsSurvived: {},
+      raidDamageAtRoundStart: {},
       round: {
         number: 1,
         maximum: options.maximumRounds ?? 6,
@@ -1077,14 +1097,51 @@ function finishOrStartRound(state: GameState): TransitionResult {
     // Each round is its own run: last round's theme does not carry over.
     chain: { tags: [], length: 0 },
   }));
+
+  // A surviving raid boss takes its turn too: it hoards more treasure, and if
+  // nobody wounded it this round it claws health back. Leaving it alone is a
+  // choice with a cost, which is what stops the board being pure accumulation.
+  let raidDamage = state.raidDamage;
+  const roundsSurvived: Record<string, number> = {
+    ...(state.raidRoundsSurvived ?? {}),
+  };
+  const wrathEvents: GameEvent[] = [];
+  let wrathSequence = state.eventSequence;
+  for (const location of state.locations) {
+    const health = location.encounter?.health;
+    if (health === undefined) continue;
+    const damage = raidDamage[location.id] ?? 0;
+    if (damage >= health) continue;
+    const before = state.raidDamageAtRoundStart?.[location.id] ?? 0;
+    const ignored = damage <= before;
+    const survived = (roundsSurvived[location.id] ?? 0) + 1;
+    roundsSurvived[location.id] = survived;
+    const healed = ignored ? Math.min(damage, RAID_REGENERATION) : 0;
+    if (healed > 0)
+      raidDamage = { ...raidDamage, [location.id]: damage - healed };
+    const remaining = health - (raidDamage[location.id] ?? 0);
+    wrathSequence += 1;
+    wrathEvents.push({
+      type: 'raid-enraged',
+      sequence: wrathSequence,
+      locationId: location.id,
+      beast: location.encounter?.beasts[0] ?? location.name,
+      regenerated: healed,
+      remaining,
+      health,
+      bountyVictoryPoints: raidBountyFor(location, survived),
+      roundsSurvived: survived,
+    });
+  }
+
   const roundLocations = configureRoundScarcity(
     state.locations,
     random,
     state.players.length,
     state.players.reduce((total, player) => total + player.dice.length, 0),
-    slainRaids(state.locations, state.raidDamage),
+    slainRaids(state.locations, raidDamage),
   );
-  const roundSequence = state.eventSequence + 1;
+  const roundSequence = wrathSequence + 1;
   const rolled = rollPlayers(resetPlayers, random, roundSequence);
   return {
     state: {
@@ -1092,6 +1149,9 @@ function finishOrStartRound(state: GameState): TransitionResult {
       players: rolled.players,
       locations: roundLocations,
       rngState: random.snapshot().state,
+      raidDamage,
+      raidRoundsSurvived: roundsSurvived,
+      raidDamageAtRoundStart: raidDamage,
       round: {
         number: nextRound,
         maximum: state.round.maximum,
@@ -1105,6 +1165,7 @@ function finishOrStartRound(state: GameState): TransitionResult {
       eventSequence: rolled.sequence,
     },
     events: [
+      ...wrathEvents,
       { type: 'round-started', sequence: roundSequence, round: nextRound },
       ...rolled.events,
     ],
@@ -1540,7 +1601,11 @@ export function applyAction(
           if (total >= health) {
             slainBeast = beast;
             if (encounter.bounty) {
-              bonusPoints += encounter.bounty.victoryPoints;
+              // The hoard has grown for every round the beast stayed alive.
+              bonusPoints += raidBountyFor(
+                location,
+                state.raidRoundsSurvived?.[location.id] ?? 0,
+              );
               for (const resource of RESOURCE_TYPES) {
                 const amount = encounter.bounty.loot?.[resource] ?? 0;
                 if (amount) bonus[resource] = (bonus[resource] ?? 0) + amount;

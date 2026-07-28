@@ -66,13 +66,16 @@ test('pins location details and exposes preview icon explanations', async ({
   await page.goto('/');
   await page.getByRole('button', { name: 'Start match' }).click();
 
-  await page.getByRole('button', { name: 'Inspect Crystal Cavern' }).click();
-
   // The decision dock beneath the board is the canonical location display.
   const preview = page.locator('.decision-dock');
-  await expect(
-    preview.getByRole('heading', { name: 'Crystal Cavern' }),
-  ).toBeVisible();
+  // The CPU acts on a timer, and each of its turns re-renders the board, which
+  // can swallow a click that lands mid-render. Retry the pin until it sticks.
+  await expect(async () => {
+    await page.getByRole('button', { name: 'Inspect Crystal Cavern' }).click();
+    await expect(
+      preview.getByRole('heading', { name: 'Crystal Cavern' }),
+    ).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 15_000 });
   await expect(preview.locator('.resource-mana').first()).toHaveAttribute(
     'data-tooltip',
     /Arcane power used by magical cards/i,

@@ -6,7 +6,11 @@ import {
   useState,
 } from 'react';
 
-import { chooseCpuAction } from '@shattered-crown/game-ai';
+import {
+  chooseCpuAction,
+  CPU_DIFFICULTIES,
+  type CpuDifficulty,
+} from '@shattered-crown/game-ai';
 import {
   cards,
   factions,
@@ -22,6 +26,7 @@ import {
   dieValue,
   enumerateLegalActions,
   extendChain,
+  raidBountyFor,
   raidDamageFor,
   serializeGame,
   validateAction,
@@ -94,6 +99,13 @@ function describeEvent(event: GameEvent, state: GameState): string {
     return `Die ${event.dieId.split('-').at(-1)} rolled ${event.faceIndex + 1}.`;
   if (event.type === 'die-rerolled')
     return `Die ${event.dieId.split('-').at(-1)} rerolled ${event.faceIndex + 1}.`;
+  if (event.type === 'raid-enraged') {
+    const healed =
+      event.regenerated > 0
+        ? ` and regenerated ${event.regenerated} health (${event.remaining}/${event.health})`
+        : '';
+    return `🐉 The ${event.beast} survived round ${event.roundsSurvived}${healed}. Its hoard is now worth ${event.bountyVictoryPoints}★.`;
+  }
   const player =
     state.players.find((item) => item.id === event.playerId)?.name ?? 'Player';
   if (event.type === 'player-passed') return `${player} passed.`;
@@ -217,6 +229,17 @@ function calloutFor(event: GameEvent, state: GameState): Callout | null {
       detail: `${actor} drove ${victim?.controller === 'human' ? 'your' : 'the rival'} die off the slot.`,
       tone: 'blow',
       weight: 70,
+    };
+  }
+  if (event.type === 'raid-enraged') {
+    return {
+      title: event.regenerated > 0 ? 'THE BEAST RECOVERS' : 'THE HOARD GROWS',
+      detail:
+        event.regenerated > 0
+          ? `Left alone, the ${event.beast} healed ${event.regenerated} — and its hoard is now ${event.bountyVictoryPoints}★.`
+          : `The ${event.beast} still lives. Its hoard is now ${event.bountyVictoryPoints}★.`,
+      tone: 'blow',
+      weight: 85,
     };
   }
   if (event.type === 'raid-damaged') {
@@ -420,12 +443,15 @@ function EncounterSummary({
   }
   const incoming = human && selectedDie ? raidDamageFor(human, selectedDie) : 0;
   const lethal = incoming >= remaining;
+  const survived = game.raidRoundsSurvived?.[location.id] ?? 0;
+  const bounty = raidBountyFor(location, survived);
   return (
     <div className={`encounter-strip raid ${lethal ? 'lethal' : ''}`}>
       <div className="encounter-title">
         <strong>⚔ {beast}</strong>
         <span>
-          {remaining}/{health} health
+          {remaining}/{health} health · {bounty}★ hoard
+          {survived > 0 ? ` · survived ${survived}` : ''}
         </span>
       </div>
       <div
@@ -438,9 +464,9 @@ function EncounterSummary({
       <p>
         {incoming > 0
           ? lethal
-            ? `Your die deals ${incoming} — the KILLING BLOW, claiming ${encounter.bounty?.victoryPoints ?? 0}★ and the hoard.`
-            : `Your die deals ${incoming}, leaving ${remaining - incoming}. Only the finisher takes the ${encounter.bounty?.victoryPoints ?? 0}★ bounty.`
-          : `Any die wounds it by its value, doubled on a 6 or masterwork face. The finisher takes ${encounter.bounty?.victoryPoints ?? 0}★ and the hoard.`}
+            ? `Your die deals ${incoming} — the KILLING BLOW, claiming ${bounty}★ and the hoard.`
+            : `Your die deals ${incoming}, leaving ${remaining - incoming}. Only the finisher takes the ${bounty}★ bounty.`
+          : `Any die wounds it by its value, doubled on a 6 or masterwork face. The finisher takes ${bounty}★ — and the hoard grows every round it lives.`}
       </p>
     </div>
   );
@@ -649,6 +675,7 @@ export function App() {
   // Chosen so Forge Hall opens in round one, keeping the tutorial's Forge step
   // demonstrable on a first run.
   const [seed, setSeed] = useState('shattered-crown-008');
+  const [difficulty, setDifficulty] = useState<CpuDifficulty>('knight');
   const [game, setGame] = useState<GameState | null>(null);
   const [selectedDieId, setSelectedDieId] = useState<DieId | null>(null);
   const [upgradeDieId, setUpgradeDieId] = useState<DieId | null>(null);
@@ -875,12 +902,12 @@ export function App() {
     const turnNumber = game.turn.turnNumber;
     const timer = window.setTimeout(() => {
       if (game.id !== matchId || game.turn.turnNumber !== turnNumber) return;
-      const result = applyAction(game, chooseCpuAction(game));
+      const result = applyAction(game, chooseCpuAction(game, difficulty));
       setGame(result.state);
       appendEvents(result.events, result.state);
     }, 220);
     return () => window.clearTimeout(timer);
-  }, [activePlayer?.controller, game]);
+  }, [activePlayer?.controller, difficulty, game]);
 
   const saveMatch = () => {
     if (!game) return;
@@ -954,6 +981,27 @@ export function App() {
             {
               factions.find((faction) => faction.id === selectedFaction)
                 ?.scoringRule
+            }
+          </p>
+          <label>
+            Opponent
+            <select
+              value={difficulty}
+              onChange={(event) =>
+                setDifficulty(event.target.value as CpuDifficulty)
+              }
+            >
+              {CPU_DIFFICULTIES.map((tier) => (
+                <option key={tier.id} value={tier.id}>
+                  {tier.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="ability scoring">
+            {
+              CPU_DIFFICULTIES.find((tier) => tier.id === difficulty)
+                ?.description
             }
           </p>
           <label>
