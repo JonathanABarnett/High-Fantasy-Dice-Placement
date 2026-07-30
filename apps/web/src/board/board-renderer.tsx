@@ -256,6 +256,11 @@ export function BoardRenderer(props: BoardRendererProps) {
         )
         .map((action) => action.slotId),
     );
+    const diceById = new Map(
+      props.game.players.flatMap((player) =>
+        player.dice.map((die) => [die.id, die] as const),
+      ),
+    );
     const pulseTargets: Graphics[] = [];
 
     props.game.locations.forEach((location, index) => {
@@ -529,22 +534,39 @@ export function BoardRenderer(props: BoardRendererProps) {
           card.addChild(die, sealed);
         } else if (slot.occupantDieId) {
           const human = slot.occupantPlayerId === props.humanPlayerId;
+          const occupantDie = diceById.get(slot.occupantDieId);
+          const occupantValue = occupantDie
+            ? String(dieValue(occupantDie))
+            : '?';
           die.fill({ color: human ? 0x397f5a : 0x9a4b3f }).stroke({
             color: slotBumpable ? 0xffd24a : human ? 0xa9ffd0 : 0xffb29f,
             width: slotBumpable ? 4 : 2,
           });
-          const owner = new Text({
-            text: slotBumpable ? '⚡' : human ? 'YOU' : 'CPU',
+          const value = new Text({
+            text: occupantValue,
             style: {
-              fill: slotBumpable ? 0xffe89a : 0xffffff,
-              fontFamily: 'Arial',
-              fontSize: slotBumpable ? 16 : 11,
+              fill: 0xffffff,
+              fontFamily: 'Georgia',
+              fontSize: 19,
               fontWeight: 'bold',
+              stroke: { color: 0x120d0b, width: 3 },
+            },
+          });
+          value.anchor.set(0.5);
+          value.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y - 5);
+          const owner = new Text({
+            text: slotBumpable ? 'BUMP' : human ? 'YOU' : 'CPU',
+            style: {
+              fill: slotBumpable ? 0xffe89a : 0xf1eadc,
+              fontFamily: 'Arial',
+              fontSize: 7,
+              fontWeight: 'bold',
+              letterSpacing: 0.4,
             },
           });
           owner.anchor.set(0.5);
-          owner.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y);
-          card.addChild(die, owner);
+          owner.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y + 13);
+          card.addChild(die, value, owner);
           if (slotBumpable) pulseTargets.push(die);
         } else {
           die
