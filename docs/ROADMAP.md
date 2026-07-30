@@ -44,6 +44,7 @@ All four faction identities are also complete, each with a distinct grip on thes
 - **The dragon's wrath** gives a raid boss its own turn: its hoard grows every round it survives and it regenerates in rounds nobody wounds it, which puts a clock on the match.
 - **Moment callouts** promote one headline per batch of events over the board, so a critical strike no longer reads like a resource tick.
 - **Opponent difficulty** (Squire / Knight / Warlord) with a top tier that weighs what each square is worth to _you_, verified to differ in real strength.
+- **Reactive motion.** The screen already had ambient animation — a breathing backdrop, rising panels, pulsing threats — but almost nothing moved in response to the player. Dice now tumble before settling on the value the engine rolled, a committed die is thrown from the tray to its board slot instead of teleporting, and scores count toward their new totals rather than snapping. All of it honours reduced motion.
 
 Remaining: compact card/market rows, tactile Forge before/after previews, richer end-of-match scoring presentation, refreshed art/audio feedback, and broader user-facing playtests around whether momentum and dragon wrath are legible without reading the log.
 
