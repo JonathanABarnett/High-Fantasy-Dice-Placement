@@ -2283,6 +2283,27 @@ select {
   background: linear-gradient(90deg, #d6483c, #f08050);
   transition: width 260ms ease;
 }
+.raid-breakdown {
+  display: grid;
+  gap: 0.16rem;
+  margin: 0 0 0.42rem;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid rgb(255 190 120 / 26%);
+  border-radius: 0.38rem;
+  background: rgb(14 10 9 / 68%);
+  box-shadow: inset 0 0 18px rgb(214 72 60 / 8%);
+}
+.raid-breakdown strong {
+  color: #ffd694;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.raid-breakdown span {
+  color: #ead2bf;
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
 .encounter-strip p {
   margin: 0;
   color: #dcc0ae;

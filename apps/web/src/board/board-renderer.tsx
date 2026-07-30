@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { dieValue } from '@shattered-crown/game-engine';
+import { dieValue, raidDamageFor } from '@shattered-crown/game-engine';
 import type {
   DieId,
   GameAction,
@@ -261,6 +261,9 @@ export function BoardRenderer(props: BoardRendererProps) {
         player.dice.map((die) => [die.id, die] as const),
       ),
     );
+    const playerById = new Map(
+      props.game.players.map((player) => [player.id, player] as const),
+    );
     const pulseTargets: Graphics[] = [];
 
     props.game.locations.forEach((location, index) => {
@@ -374,10 +377,10 @@ export function BoardRenderer(props: BoardRendererProps) {
         const label = dead
           ? '☠ BEAST SLAIN'
           : health !== undefined
-            ? `⚔ RAID · ${health - damage}/${health}`
+            ? `⚔ ${health - damage}/${health} · ${damage} DMG`
             : '⚔ MONSTER HUNT';
         const hunt = new Graphics()
-          .roundRect(10, 10, 132, 22, 11)
+          .roundRect(10, 10, health !== undefined ? 148 : 132, 22, 11)
           .fill({ color: dead ? 0x2f2a26 : 0x571a16, alpha: 0.96 })
           .stroke({
             color: dead ? 0x8d8578 : 0xe8874a,
@@ -389,7 +392,7 @@ export function BoardRenderer(props: BoardRendererProps) {
           style: {
             fill: dead ? 0xcfc7ba : 0xffd7b0,
             fontFamily: 'Arial',
-            fontSize: 10,
+            fontSize: health !== undefined ? 9.5 : 10,
             fontWeight: 'bold',
           },
         });
@@ -401,14 +404,14 @@ export function BoardRenderer(props: BoardRendererProps) {
           const remaining = Math.max(0, 1 - damage / health);
           card.addChild(
             new Graphics()
-              .roundRect(10, 34, 132, 7, 4)
+              .roundRect(10, 34, 148, 7, 4)
               .fill({ color: 0x1d1512, alpha: 0.95 })
               .stroke({ color: 0x7a4a30, width: 1, alpha: 0.9 }),
           );
           if (remaining > 0) {
             card.addChild(
               new Graphics()
-                .roundRect(11, 35, Math.max(2, 130 * remaining), 5, 3)
+                .roundRect(11, 35, Math.max(2, 146 * remaining), 5, 3)
                 .fill({ color: 0xd6483c, alpha: 0.95 }),
             );
           }
@@ -444,7 +447,7 @@ export function BoardRenderer(props: BoardRendererProps) {
                   textFill: 0xf0b1a6,
                 };
         const badge = new Graphics()
-          .roundRect(151, 8, 91, 24, 12)
+          .roundRect(164, 8, 78, 24, 12)
           .fill({ color: badgeState.fill, alpha: 0.96 })
           .stroke({
             color: badgeState.stroke,
@@ -461,7 +464,7 @@ export function BoardRenderer(props: BoardRendererProps) {
           },
         });
         badgeText.anchor.set(0.5);
-        badgeText.position.set(196, 20);
+        badgeText.position.set(203, 20);
         card.addChild(badge, badgeText);
       }
 
@@ -534,10 +537,30 @@ export function BoardRenderer(props: BoardRendererProps) {
           card.addChild(die, sealed);
         } else if (slot.occupantDieId) {
           const human = slot.occupantPlayerId === props.humanPlayerId;
+          const occupantPlayer = slot.occupantPlayerId
+            ? playerById.get(slot.occupantPlayerId)
+            : undefined;
           const occupantDie = diceById.get(slot.occupantDieId);
           const occupantValue = occupantDie
             ? String(dieValue(occupantDie))
             : '?';
+          const occupantRaidDamage =
+            location.encounter?.health !== undefined &&
+            occupantPlayer &&
+            occupantDie
+              ? raidDamageFor(occupantPlayer, occupantDie)
+              : null;
+          const landingRing = new Graphics()
+            .roundRect(x - 5, SLOT_Y - 5, SLOT_SIZE + 10, SLOT_SIZE + 10, 11)
+            .stroke({
+              color: slotBumpable ? 0xffd24a : human ? 0xa9ffd0 : 0xffb29f,
+              width: slotBumpable ? 3 : 2,
+              alpha: 0.58,
+            });
+          card.addChild(landingRing);
+          if (slotBumpable || occupantRaidDamage !== null) {
+            pulseTargets.push(landingRing);
+          }
           die.fill({ color: human ? 0x397f5a : 0x9a4b3f }).stroke({
             color: slotBumpable ? 0xffd24a : human ? 0xa9ffd0 : 0xffb29f,
             width: slotBumpable ? 4 : 2,
@@ -555,11 +578,18 @@ export function BoardRenderer(props: BoardRendererProps) {
           value.anchor.set(0.5);
           value.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y - 5);
           const owner = new Text({
-            text: slotBumpable ? 'BUMP' : human ? 'YOU' : 'CPU',
+            text:
+              occupantRaidDamage !== null
+                ? `${occupantRaidDamage} DMG`
+                : slotBumpable
+                  ? 'BUMP'
+                  : human
+                    ? 'YOU'
+                    : 'CPU',
             style: {
               fill: slotBumpable ? 0xffe89a : 0xf1eadc,
               fontFamily: 'Arial',
-              fontSize: 7,
+              fontSize: occupantRaidDamage !== null ? 6.5 : 7,
               fontWeight: 'bold',
               letterSpacing: 0.4,
             },
@@ -569,6 +599,17 @@ export function BoardRenderer(props: BoardRendererProps) {
           card.addChild(die, value, owner);
           if (slotBumpable) pulseTargets.push(die);
         } else {
+          if (slotLegal) {
+            const targetRing = new Graphics()
+              .roundRect(x - 6, SLOT_Y - 6, SLOT_SIZE + 12, SLOT_SIZE + 12, 11)
+              .stroke({
+                color: slotRecommended ? 0xffd36d : 0x78efac,
+                width: slotRecommended ? 4 : 3,
+                alpha: 0.76,
+              });
+            card.addChild(targetRing);
+            pulseTargets.push(targetRing);
+          }
           die
             .fill({
               color: props.selectedDieId
@@ -605,6 +646,22 @@ export function BoardRenderer(props: BoardRendererProps) {
           requirement.anchor.set(0.5);
           requirement.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y);
           card.addChild(die, requirement);
+          if (slotLegal) {
+            const landCue = new Text({
+              text: slotRecommended ? 'LAND ★' : 'LAND',
+              style: {
+                fill: slotRecommended ? 0xffedba : 0xbaffd3,
+                fontFamily: 'Arial',
+                fontSize: 7,
+                fontWeight: 'bold',
+                letterSpacing: 0.5,
+                stroke: { color: 0x120d0b, width: 2 },
+              },
+            });
+            landCue.anchor.set(0.5);
+            landCue.position.set(x + SLOT_SIZE / 2, SLOT_Y - 11);
+            card.addChild(landCue);
+          }
         }
         if (slotRecommended) pulseTargets.push(die);
       });

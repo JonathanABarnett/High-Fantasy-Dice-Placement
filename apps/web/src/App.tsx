@@ -395,6 +395,56 @@ function previewRewardLabel(values: Partial<Record<ResourceType, number>>) {
     .join(', ');
 }
 
+function isCriticalDie(die: PlayerState['dice'][number]) {
+  const face =
+    die.rolledFaceIndex === null ? null : die.faces[die.rolledFaceIndex];
+  return dieValue(die) >= 6 || (face?.symbols.includes('masterwork') ?? false);
+}
+
+function raidDamageBreakdown(
+  player: PlayerState,
+  die: PlayerState['dice'][number],
+) {
+  const value = dieValue(die);
+  const base = isCriticalDie(die) ? value * 2 : value;
+  const factionBonus = raidDamageFor(player, die) - base;
+  return { base, factionBonus, total: base + factionBonus };
+}
+
+function raidDamageLabel(
+  player: PlayerState,
+  die: PlayerState['dice'][number],
+) {
+  const breakdown = raidDamageBreakdown(player, die);
+  const parts = [`${breakdown.base}`];
+  if (breakdown.factionBonus > 0)
+    parts.push(`Ember +${breakdown.factionBonus}`);
+  return `${parts.join(' + ')} = ${breakdown.total}`;
+}
+
+function raidContributionRows(
+  game: GameState,
+  location: GameState['locations'][number],
+  humanPlayerId: PlayerId | undefined,
+) {
+  return location.slots.flatMap((slot) => {
+    if (!slot.occupantPlayerId || !slot.occupantDieId) return [];
+    const player = game.players.find(
+      (item) => item.id === slot.occupantPlayerId,
+    );
+    const die = player?.dice.find((item) => item.id === slot.occupantDieId);
+    if (!player || !die) return [];
+    const breakdown = raidDamageBreakdown(player, die);
+    return [
+      {
+        breakdown,
+        die,
+        owner: player.id === humanPlayerId ? 'You' : player.name,
+      },
+    ];
+  });
+}
+
 function previewMove(
   state: GameState,
   player: PlayerState,
@@ -1014,6 +1064,10 @@ function EncounterSummary({
     );
   }
   const incoming = human && selectedDie ? raidDamageFor(human, selectedDie) : 0;
+  const incomingLabel =
+    human && selectedDie ? raidDamageLabel(human, selectedDie) : '';
+  const contributions = raidContributionRows(game, location, human?.id);
+  const dealt = health - remaining;
   const lethal = incoming >= remaining;
   const survived = game.raidRoundsSurvived?.[location.id] ?? 0;
   const bounty = raidBountyFor(location, survived);
@@ -1036,11 +1090,27 @@ function EncounterSummary({
       >
         <span style={{ width: `${(remaining / health) * 100}%` }} />
       </div>
+      <div className="raid-breakdown" aria-label="Raid damage breakdown">
+        <strong>{dealt} damage already dealt</strong>
+        {contributions.length > 0 ? (
+          contributions.map((row) => (
+            <span key={`${row.owner}-${row.die.id}`}>
+              {row.owner}: die {dieValue(row.die)} →{' '}
+              {row.breakdown.factionBonus > 0
+                ? `${row.breakdown.base} + ${row.breakdown.factionBonus} faction`
+                : row.breakdown.base}{' '}
+              = {row.breakdown.total}
+            </span>
+          ))
+        ) : (
+          <span>No dice have wounded this raid yet.</span>
+        )}
+      </div>
       <p>
         {incoming > 0
           ? lethal
-            ? `Your die deals ${incoming} — the KILLING BLOW, claiming ${bounty}★ and the hoard.`
-            : `Your die deals ${incoming}, leaving ${remaining - incoming}. Only the finisher takes the ${bounty}★ bounty.`
+            ? `Selected die damage: ${incomingLabel}. That is the KILLING BLOW, claiming ${bounty}★ and the hoard.`
+            : `Selected die damage: ${incomingLabel}, leaving ${remaining - incoming}. Only the finisher takes the ${bounty}★ bounty.`
           : `Any die wounds it by its value, doubled on a 6 or masterwork face. The finisher takes ${bounty}★ — and the hoard grows every round it lives.`}
       </p>
     </div>
