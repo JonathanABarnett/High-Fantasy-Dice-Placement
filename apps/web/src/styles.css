@@ -883,6 +883,119 @@ select {
 .die[draggable='true']:active {
   cursor: grabbing;
 }
+.move-advisor {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  padding: 0.52rem;
+  border: 1px solid #745534;
+  border-radius: 0.55rem;
+  background:
+    radial-gradient(circle at 0 0, rgb(241 190 91 / 18%), transparent 42%),
+    #15110d;
+}
+.move-advisor.empty {
+  gap: 0.12rem;
+  color: #bba98c;
+}
+.move-advisor.empty strong,
+.move-advisor-head strong {
+  color: #f4d99d;
+  font-size: 0.72rem;
+}
+.move-advisor.empty span,
+.move-advisor-head span {
+  color: #aa9a83;
+  font-size: 0.6rem;
+  line-height: 1.28;
+}
+.move-advisor-head {
+  display: grid;
+  gap: 0.08rem;
+}
+.move-list {
+  display: grid;
+  gap: 0.32rem;
+}
+.move-preview {
+  display: grid;
+  grid-template-columns: 2.35rem minmax(0, 1fr) auto;
+  gap: 0.42rem;
+  align-items: center;
+  width: 100%;
+  padding: 0.42rem;
+  border: 1px solid #4b3a27;
+  border-radius: 0.42rem;
+  color: inherit;
+  background: #1c1712;
+  text-align: left;
+}
+.move-preview:hover:not(:disabled),
+.move-preview:focus-visible {
+  border-color: #d9a95e;
+  background:
+    linear-gradient(135deg, rgb(107 72 31 / 52%), transparent 76%), #211810;
+  transform: none;
+}
+.move-preview.recommended {
+  border-color: #e1b461;
+  box-shadow: 0 0 0.85rem rgb(228 177 86 / 14%);
+}
+.move-preview.bump {
+  border-color: #b86d50;
+}
+.move-rank {
+  display: grid;
+  min-height: 2.2rem;
+  border: 1px solid #5f482e;
+  border-radius: 0.35rem;
+  color: #241604;
+  background: linear-gradient(180deg, #f7cd71, #b67b31);
+  font-size: 0.56rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  place-items: center;
+  text-transform: uppercase;
+}
+.move-copy {
+  display: grid;
+  gap: 0.08rem;
+  min-width: 0;
+}
+.move-copy strong {
+  overflow: hidden;
+  color: #f7dcaa;
+  font-size: 0.68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.move-copy span {
+  color: #d8c19b;
+  font-size: 0.62rem;
+  line-height: 1.25;
+}
+.move-copy em {
+  overflow: hidden;
+  color: #a99a83;
+  font-size: 0.55rem;
+  font-style: normal;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.move-yield {
+  display: grid;
+  gap: 0.12rem;
+  justify-items: end;
+  min-width: 3rem;
+}
+.move-yield b {
+  color: #ffe08a;
+  font-size: 0.72rem;
+}
+.move-yield .token-list {
+  justify-content: flex-end;
+}
 .turn-summary {
   order: 1;
   display: grid;

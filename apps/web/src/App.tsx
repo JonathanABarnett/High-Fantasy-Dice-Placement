@@ -91,6 +91,13 @@ const ENCOUNTER_ART = {
   hunt: monsterHuntArt,
   raid: elderDragonArt,
 } as const;
+const RESOURCE_TYPES: readonly ResourceType[] = [
+  'gold',
+  'mana',
+  'knowledge',
+  'materials',
+  'influence',
+];
 
 interface SavedMatchEnvelope {
   readonly envelopeVersion: typeof SAVE_ENVELOPE_VERSION;
@@ -353,6 +360,221 @@ function isLowRollFriendly(requirement: PlacementRequirement): boolean {
     (requirement.minimumValue ?? 1) <= 2 &&
     !requirement.affinities?.length &&
     Object.keys(requirement.cost ?? {}).length === 0
+  );
+}
+
+interface MovePreview {
+  readonly action: Extract<GameAction, { type: 'place-die' | 'bump-die' }>;
+  readonly location: GameState['locations'][number];
+  readonly slotNumber: number;
+  readonly die: PlayerState['dice'][number];
+  readonly score: number;
+  readonly gained: Partial<Record<ResourceType, number>>;
+  readonly victoryPoints: number;
+  readonly objectivePoints: number;
+  readonly chainLength: number | null;
+  readonly chainBonus: number;
+  readonly raidDamage: number;
+  readonly raidRemaining: number | null;
+  readonly bump: boolean;
+  readonly headline: string;
+  readonly stakes: readonly string[];
+}
+
+function addPreviewResource(
+  gained: Partial<Record<ResourceType, number>>,
+  resource: ResourceType,
+  amount: number,
+) {
+  gained[resource] = (gained[resource] ?? 0) + amount;
+}
+
+function previewRewardLabel(values: Partial<Record<ResourceType, number>>) {
+  return RESOURCE_TYPES.filter((resource) => (values[resource] ?? 0) > 0)
+    .map((resource) => `+${values[resource]} ${RESOURCE_INFO[resource].label}`)
+    .join(', ');
+}
+
+function previewMove(
+  state: GameState,
+  player: PlayerState,
+  action: Extract<GameAction, { type: 'place-die' | 'bump-die' }>,
+): MovePreview | null {
+  const location = state.locations.find(
+    (item) => item.id === action.locationId,
+  );
+  const die = player.dice.find((item) => item.id === action.dieId);
+  if (!location || !die) return null;
+  const slotIndex = location.slots.findIndex(
+    (slot) => slot.id === action.slotId,
+  );
+  if (slotIndex < 0) return null;
+
+  const result = applyAction(state, action);
+  const gained: Partial<Record<ResourceType, number>> = {};
+  let victoryPoints = 0;
+  let objectivePoints = 0;
+  let chainLength: number | null = null;
+  let chainBonus = 0;
+  let raidDamage = 0;
+  let raidRemaining: number | null = null;
+  let bump = action.type === 'bump-die';
+  const stakes: string[] = [];
+
+  for (const event of result.events) {
+    if ('playerId' in event && event.playerId !== player.id) continue;
+    if (event.type === 'resource-gained') {
+      addPreviewResource(gained, event.resource, event.amount);
+    }
+    if (event.type === 'victory-points-gained') {
+      victoryPoints += event.amount;
+    }
+    if (event.type === 'objective-claimed') {
+      objectivePoints += event.victoryPoints;
+      stakes.push(`Claims a crown quest for ${event.victoryPoints}★`);
+    }
+    if (event.type === 'chain-extended') {
+      chainLength = event.length;
+      chainBonus += event.bonusVictoryPoints;
+      if (event.bonusVictoryPoints > 0) {
+        stakes.push(
+          `Extends your ${event.tag} run for +${event.bonusVictoryPoints}★`,
+        );
+      } else if (event.length > 1) {
+        stakes.push(`Keeps your ${event.tag} run alive`);
+      }
+    }
+    if (event.type === 'monster-slain') {
+      stakes.push(
+        event.critical
+          ? `Critical hunt: ${event.beast} slain for +${event.bonusVictoryPoints}★`
+          : `Slays ${event.beast}`,
+      );
+    }
+    if (event.type === 'raid-damaged') {
+      raidDamage += event.damage;
+      raidRemaining = event.remaining;
+      stakes.push(
+        event.remaining === 0
+          ? `Killing blow on ${event.beast}`
+          : `${event.damage} damage to ${event.beast}`,
+      );
+    }
+    if (event.type === 'die-bumped') {
+      bump = true;
+      stakes.push('Bumps a rival die off the board');
+    }
+  }
+
+  const rewardText = previewRewardLabel(gained);
+  const headline =
+    stakes[0] ??
+    (victoryPoints > 0
+      ? `Scores ${victoryPoints}★ now`
+      : rewardText
+        ? `Builds economy: ${rewardText}`
+        : 'Claims board position');
+  const score =
+    victoryPoints * 12 +
+    objectivePoints * 10 +
+    chainBonus * 9 +
+    raidDamage * 2 +
+    (bump ? 14 : 0) +
+    RESOURCE_TYPES.reduce(
+      (total, resource) => total + (gained[resource] ?? 0) * 3,
+      0,
+    ) +
+    (chainLength ?? 0);
+
+  return {
+    action,
+    location,
+    slotNumber: slotIndex + 1,
+    die,
+    score,
+    gained,
+    victoryPoints,
+    objectivePoints,
+    chainLength,
+    chainBonus,
+    raidDamage,
+    raidRemaining,
+    bump,
+    headline,
+    stakes,
+  };
+}
+
+function MoveAdvisor({
+  previews,
+  selectedDie,
+  onCommit,
+}: {
+  readonly previews: readonly MovePreview[];
+  readonly selectedDie: PlayerState['dice'][number] | null;
+  readonly onCommit: (action: MovePreview['action']) => void;
+}) {
+  if (previews.length === 0) {
+    return (
+      <section className="move-advisor empty" aria-label="Move advisor">
+        <strong>
+          {selectedDie ? 'No legal route' : 'Choose a die to plan'}
+        </strong>
+        <span>
+          {selectedDie
+            ? 'This die cannot reach an open square right now. Try a card, another die, or pass.'
+            : 'Select a die to reveal the moves that actually matter this turn.'}
+        </span>
+      </section>
+    );
+  }
+
+  return (
+    <section className="move-advisor" aria-label="Move advisor">
+      <div className="move-advisor-head">
+        <strong>
+          {selectedDie ? 'Best routes for this die' : 'Most tempting moves'}
+        </strong>
+        <span>Preview the payoff before committing.</span>
+      </div>
+      <div className="move-list">
+        {previews.slice(0, 3).map((preview, index) => (
+          <button
+            className={`move-preview ${index === 0 ? 'recommended' : ''} ${
+              preview.bump ? 'bump' : ''
+            }`}
+            key={`${preview.action.type}-${preview.location.id}-${preview.action.slotId}-${preview.die.id}`}
+            onClick={() => onCommit(preview.action)}
+            type="button"
+          >
+            <span className="move-rank">
+              {index === 0 ? 'Best' : `#${index + 1}`}
+            </span>
+            <span className="move-copy">
+              <strong>
+                {preview.location.name} · slot {preview.slotNumber}
+              </strong>
+              <span>{preview.headline}</span>
+              <em>
+                {preview.stakes.slice(1, 3).join(' · ') ||
+                  previewRewardLabel(preview.gained) ||
+                  (preview.raidRemaining !== null
+                    ? `${preview.raidRemaining} health left`
+                    : 'Safe tempo play')}
+              </em>
+            </span>
+            <span className="move-yield">
+              {preview.victoryPoints + preview.objectivePoints > 0 && (
+                <b>+{preview.victoryPoints + preview.objectivePoints}★</b>
+              )}
+              {RESOURCE_TYPES.some(
+                (resource) => (preview.gained[resource] ?? 0) > 0,
+              ) && <ResourceList values={preview.gained} />}
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -907,6 +1129,21 @@ export function App() {
         action.dieId === selectedDieId,
     );
   }, [game, legalActions, selectedDieId]);
+  const movePreviews = useMemo(() => {
+    if (!game || !human || activePlayer?.controller !== 'human') return [];
+    return legalActions
+      .filter(
+        (
+          action,
+        ): action is Extract<GameAction, { type: 'place-die' | 'bump-die' }> =>
+          (action.type === 'place-die' || action.type === 'bump-die') &&
+          action.playerId === human.id &&
+          (!selectedDieId || action.dieId === selectedDieId),
+      )
+      .map((action) => previewMove(game, human, action))
+      .filter((preview): preview is MovePreview => preview !== null)
+      .sort((left, right) => right.score - left.score);
+  }, [activePlayer?.controller, game, human, legalActions, selectedDieId]);
   const hoverLocation = (locationId: LocationId | null) => {
     setHoveredLocationId(locationId);
   };
@@ -1485,6 +1722,13 @@ export function App() {
                 })}
               </div>
               {human && <MomentumMeter player={human} />}
+              {human && activePlayer?.controller === 'human' && (
+                <MoveAdvisor
+                  previews={movePreviews}
+                  selectedDie={selectedDie}
+                  onCommit={submitHumanAction}
+                />
+              )}
               <section className="turn-summary" aria-label="Current turn plan">
                 <div>
                   <strong>
