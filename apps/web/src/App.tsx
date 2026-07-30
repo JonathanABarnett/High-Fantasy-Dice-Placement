@@ -747,10 +747,10 @@ const FLIGHT_MS = 420;
 /**
  * Throws a copy of a die from the tray to the board slot it was committed to.
  *
- * Deliberately built outside React: the CPU acts on a timer, and the renders
- * that causes tore down and restarted a React-owned animation so the die never
- * actually travelled. A detached node owns its own lifetime and cleans itself
- * up when the animation finishes.
+ * Kept outside React on purpose. This is fire-and-forget decoration with no
+ * bearing on state, and the CPU's turn timer re-renders this tree every few
+ * hundred milliseconds; a detached node owns its own lifetime and cannot be
+ * torn down mid-flight by an unrelated render. It removes itself when done.
  */
 function throwDieToBoard(
   dieId: DieId,
@@ -787,6 +787,39 @@ function throwDieToBoard(
   );
   animation.onfinish = () => node.remove();
   animation.oncancel = () => node.remove();
+}
+
+/**
+ * Counts a number toward its new value instead of snapping to it, so a gain
+ * reads as something that happened rather than a figure that was always there.
+ * Falls back to the exact value immediately under reduced motion.
+ */
+function CountUp({
+  value,
+  reducedMotion,
+}: {
+  readonly value: number;
+  readonly reducedMotion: boolean;
+}) {
+  const [shown, setShown] = useState(value);
+  useEffect(() => {
+    if (reducedMotion) {
+      setShown(value);
+      return;
+    }
+    let current = shown;
+    if (current === value) return;
+    const step = current < value ? 1 : -1;
+    const timer = window.setInterval(() => {
+      current += step;
+      setShown(current);
+      if (current === value) window.clearInterval(timer);
+    }, 55);
+    return () => window.clearInterval(timer);
+    // Chasing `value` only; `shown` is the animation's own cursor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, reducedMotion]);
+  return <>{shown}</>;
 }
 
 /** How long dice tumble before settling on the value the engine rolled. */
@@ -1723,7 +1756,12 @@ export function App() {
             {/* The standing is the loudest thing on screen, because "am I
                 winning?" is the question the old layout could not answer. */}
             <div className="player-score">
-              <strong>{scoreTotal(game, player.id)}</strong>
+              <strong>
+                <CountUp
+                  reducedMotion={reducedMotion}
+                  value={scoreTotal(game, player.id)}
+                />
+              </strong>
               <span>
                 {leader.margin === 0
                   ? 'level'
