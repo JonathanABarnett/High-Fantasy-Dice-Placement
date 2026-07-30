@@ -59,6 +59,17 @@ function tutorialHotspotStyle(point: BoardPoint) {
   };
 }
 
+function tutorialLandmarkStyle(point: BoardPoint) {
+  const width = CARD_WIDTH * 0.56;
+  const height = CARD_HEIGHT * 0.5;
+  return {
+    left: `${((point.x + (CARD_WIDTH - width) / 2) / BOARD_WIDTH) * 100}%`,
+    top: `${((point.y + 12) / BOARD_HEIGHT) * 100}%`,
+    width: `${(width / BOARD_WIDTH) * 100}%`,
+    height: `${(height / BOARD_HEIGHT) * 100}%`,
+  };
+}
+
 const REGION_COLORS: Readonly<Record<string, number>> = {
   arcane: 0x4f3a74,
   knowledge: 0x35516d,
@@ -679,7 +690,7 @@ export function BoardRenderer(props: BoardRendererProps) {
           aria-hidden="true"
           className="tutorial-hotspot"
           data-tutorial="forge-location"
-          style={tutorialHotspotStyle(forgePoint)}
+          style={tutorialLandmarkStyle(forgePoint)}
         />
       )}
       {huntPoint && (
@@ -687,7 +698,7 @@ export function BoardRenderer(props: BoardRendererProps) {
           aria-hidden="true"
           className="tutorial-hotspot"
           data-tutorial="hunt-location"
-          style={tutorialHotspotStyle(huntPoint)}
+          style={tutorialLandmarkStyle(huntPoint)}
         />
       )}
       {raidPoint && (
@@ -695,7 +706,7 @@ export function BoardRenderer(props: BoardRendererProps) {
           aria-hidden="true"
           className="tutorial-hotspot"
           data-tutorial="raid-location"
-          style={tutorialHotspotStyle(raidPoint)}
+          style={tutorialLandmarkStyle(raidPoint)}
         />
       )}
       {props.game.locations.map((location, index) => {

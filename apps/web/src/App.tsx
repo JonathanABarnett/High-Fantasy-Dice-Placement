@@ -742,6 +742,102 @@ function ForgeFacePreview({
   );
 }
 
+const FLIGHT_MS = 420;
+
+/**
+ * Throws a copy of a die from the tray to the board slot it was committed to.
+ *
+ * Deliberately built outside React: the CPU acts on a timer, and the renders
+ * that causes tore down and restarted a React-owned animation so the die never
+ * actually travelled. A detached node owns its own lifetime and cleans itself
+ * up when the animation finishes.
+ */
+function throwDieToBoard(
+  dieId: DieId,
+  locationId: LocationId,
+  label: string,
+  affinity: string,
+): void {
+  const source = document.querySelector<HTMLElement>(
+    `[data-die-id="${dieId}"]`,
+  );
+  const target = document.querySelector<HTMLElement>(
+    `[data-testid="location-hotspot-${locationId}"]`,
+  );
+  if (!source || !target) return;
+  const from = source.getBoundingClientRect();
+  const to = target.getBoundingClientRect();
+  const node = document.createElement('div');
+  node.className = `die-flight die-${affinity}`;
+  node.setAttribute('aria-hidden', 'true');
+  node.textContent = label;
+  document.body.appendChild(node);
+  const animation = node.animate(
+    [
+      {
+        transform: `translate(${from.left + from.width / 2}px, ${from.top + from.height / 2}px) translate(-50%, -50%) scale(0.85) rotate(-12deg)`,
+        opacity: 0.25,
+      },
+      {
+        transform: `translate(${to.left + to.width / 2}px, ${to.top + to.height / 2}px) translate(-50%, -50%) scale(1.2) rotate(12deg)`,
+        opacity: 0,
+      },
+    ],
+    { duration: FLIGHT_MS, easing: 'cubic-bezier(0.3, 0.9, 0.3, 1)' },
+  );
+  animation.onfinish = () => node.remove();
+  animation.oncancel = () => node.remove();
+}
+
+/** How long dice tumble before settling on the value the engine rolled. */
+const ROLL_DURATION_MS = 620;
+const ROLL_TICK_MS = 60;
+
+/**
+ * Cosmetic tumbling for the dice tray. This is a dice game in which the player
+ * had never actually seen a die roll — values simply changed between rounds.
+ * The faces shown mid-tumble are decoration only and are never read back into
+ * game state, so determinism and replays are untouched.
+ */
+function useDiceRoll(
+  dice: readonly PlayerState['dice'][number][] | undefined,
+  reducedMotion: boolean,
+): { readonly rolling: boolean; readonly faceFor: (dieId: DieId) => number } {
+  // Signature of the engine's rolled values; a change means fresh dice.
+  const signature = (dice ?? [])
+    .map((die) => `${die.id}:${die.rolledFaceIndex ?? 'x'}`)
+    .join('|');
+  const [rolling, setRolling] = useState(false);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    if (reducedMotion || signature === '') return;
+    setRolling(true);
+    const spin = window.setInterval(
+      () => setTick((current) => current + 1),
+      ROLL_TICK_MS,
+    );
+    const stop = window.setTimeout(() => {
+      window.clearInterval(spin);
+      setRolling(false);
+    }, ROLL_DURATION_MS);
+    return () => {
+      window.clearInterval(spin);
+      window.clearTimeout(stop);
+      setRolling(false);
+    };
+  }, [reducedMotion, signature]);
+
+  const faceFor = (dieId: DieId) => {
+    // Vary per die so they do not tumble in lockstep.
+    let hash = tick * 31;
+    for (let index = 0; index < dieId.length; index += 1)
+      hash = (hash * 33 + dieId.charCodeAt(index)) >>> 0;
+    return (hash % 6) + 1;
+  };
+  return { rolling, faceFor };
+}
+
 /**
  * Sidebar tabs, with a predicate for whether a turn can still be spent there.
  * Keeping this as data means the five buttons stay identical in behaviour and
@@ -1154,6 +1250,7 @@ export function App() {
     () => (game ? enumerateLegalActions(game) : []),
     [game],
   );
+  const diceRoll = useDiceRoll(human?.dice, reducedMotion);
   /** Who is ahead on the real scoring rules, and by how much. */
   const leader = useMemo(() => {
     if (!game) return { id: null as PlayerId | null, margin: 0 };
@@ -1334,6 +1431,17 @@ export function App() {
     setError(null);
   };
 
+  const launchDieFlight = (dieId: DieId, locationId: LocationId) => {
+    if (reducedMotion || !human) return;
+    const die = human.dice.find((item) => item.id === dieId);
+    throwDieToBoard(
+      dieId,
+      locationId,
+      die ? String(dieValue(die)) : '',
+      die?.affinity ?? 'neutral',
+    );
+  };
+
   const placeAtLocation = (
     locationId: LocationId,
     requestedDieId: DieId | null,
@@ -1371,6 +1479,7 @@ export function App() {
       (candidate) => validateAction(game, candidate).legal,
     );
     if (legal) {
+      launchDieFlight(dieId, locationId);
       submitHumanAction(legal);
       if (
         legal.type === 'place-die' &&
@@ -1541,7 +1650,7 @@ export function App() {
   }
 
   return (
-    <main className="game-shell">
+    <main className={`game-shell ${reducedMotion ? 'reduced-motion' : ''}`}>
       <header className="game-header" data-tutorial="header">
         <div>
           <p className="eyebrow">Six rounds to claim the crown</p>
@@ -1723,8 +1832,14 @@ export function App() {
                 {human?.dice.map((die) => {
                   const affinity = AFFINITY_INFO[die.affinity];
                   const boost = die.valueBonus ?? 0;
-                  const value =
+                  const settled =
                     die.rolledFaceIndex === null ? '—' : dieValue(die);
+                  // While tumbling, show throwaway faces so the roll reads as
+                  // a roll. The settled value is what every rule uses.
+                  const value =
+                    diceRoll.rolling && die.rolledFaceIndex !== null
+                      ? diceRoll.faceFor(die.id)
+                      : settled;
                   const rolledFace =
                     die.rolledFaceIndex === null
                       ? null
@@ -1741,12 +1856,16 @@ export function App() {
                     selectedDieId === die.id ? 'selected' : '',
                     boost > 0 ? 'boosted' : '',
                     die.enhancements.length ? 'forged' : '',
+                    diceRoll.rolling && die.rolledFaceIndex !== null
+                      ? 'rolling'
+                      : '',
                   ]
                     .filter(Boolean)
                     .join(' ');
                   return (
                     <button
                       className={classes}
+                      data-die-id={die.id}
                       data-tooltip={`${affinity.label}: ${affinity.description}${symbolSummary}${forgedSummary}`}
                       disabled={
                         die.status !== 'ready' ||
