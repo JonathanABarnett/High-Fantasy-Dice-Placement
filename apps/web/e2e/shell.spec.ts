@@ -128,9 +128,13 @@ test('guides a new player through the complete visual tutorial', async ({
     await next.click({ timeout: 10_000 });
     await expect(tutorial.getByRole('heading', { name: title })).toBeVisible();
     if (title === 'Unlock upgrades at Forge Hall') {
-      const boardBox = await page.getByTestId('pixi-board').boundingBox();
-      const focusBox = await page.locator('.tutorial-focus').boundingBox();
-      expect(focusBox?.width ?? 0).toBeLessThan((boardBox?.width ?? 0) / 3);
+      // The overlay re-anchors its focus ring on a short timer, so read the
+      // settled box rather than whichever value the step transition left.
+      await expect(async () => {
+        const boardBox = await page.getByTestId('pixi-board').boundingBox();
+        const focusBox = await page.locator('.tutorial-focus').boundingBox();
+        expect(focusBox?.width ?? 0).toBeLessThan((boardBox?.width ?? 0) / 3);
+      }).toPass({ timeout: 10_000 });
       await expect(tutorial).toContainText('When Forge Hall is open');
     }
   }
