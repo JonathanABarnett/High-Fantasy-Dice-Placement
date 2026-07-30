@@ -578,6 +578,60 @@ function MoveAdvisor({
   );
 }
 
+function RivalThreats({
+  previews,
+  onInspect,
+}: {
+  readonly previews: readonly MovePreview[];
+  readonly onInspect: (locationId: LocationId) => void;
+}) {
+  if (previews.length === 0) {
+    return (
+      <section className="rival-threats calm" aria-label="Rival threats">
+        <strong>Rival pressure</strong>
+        <span>
+          The CPU has no obvious placement route if the board froze here.
+        </span>
+      </section>
+    );
+  }
+  const primary = previews[0]!;
+  const others = previews.slice(1);
+  return (
+    <section className="rival-threats" aria-label="Rival threats">
+      <div className="rival-threats-head">
+        <strong>CPU wants next</strong>
+        <span>If you leave the board open.</span>
+      </div>
+      <button
+        className={`rival-threat primary-threat ${primary.bump ? 'bump' : ''}`}
+        onClick={() => onInspect(primary.location.id)}
+        type="button"
+      >
+        <span className="threat-mark">!</span>
+        <span>
+          <strong>{primary.location.name}</strong>
+          <em>{primary.headline}</em>
+        </span>
+      </button>
+      {others.slice(0, 2).map((preview) => (
+        <button
+          className="rival-threat"
+          key={`${preview.action.type}-${preview.location.id}-${preview.action.slotId}-${preview.die.id}`}
+          onClick={() => onInspect(preview.location.id)}
+          type="button"
+        >
+          <span className="threat-mark small">?</span>
+          <span>
+            <strong>{preview.location.name}</strong>
+            <em>{preview.headline}</em>
+          </span>
+        </button>
+      ))}
+    </section>
+  );
+}
+
 function RequirementTokens({
   requirement,
 }: {
@@ -1092,6 +1146,7 @@ export function App() {
   );
 
   const human = game?.players.find((player) => player.controller === 'human');
+  const cpu = game?.players.find((player) => player.controller === 'cpu');
   const activePlayer = game?.players.find(
     (player) => player.id === game.turn.activePlayerId,
   );
@@ -1144,6 +1199,24 @@ export function App() {
       .filter((preview): preview is MovePreview => preview !== null)
       .sort((left, right) => right.score - left.score);
   }, [activePlayer?.controller, game, human, legalActions, selectedDieId]);
+  const rivalPreviews = useMemo(() => {
+    if (!game || !cpu || activePlayer?.controller !== 'human') return [];
+    const hypothetical: GameState = {
+      ...game,
+      turn: { ...game.turn, activePlayerId: cpu.id },
+    };
+    return enumerateLegalActions(hypothetical)
+      .filter(
+        (
+          action,
+        ): action is Extract<GameAction, { type: 'place-die' | 'bump-die' }> =>
+          (action.type === 'place-die' || action.type === 'bump-die') &&
+          action.playerId === cpu.id,
+      )
+      .map((action) => previewMove(hypothetical, cpu, action))
+      .filter((preview): preview is MovePreview => preview !== null)
+      .sort((left, right) => right.score - left.score);
+  }, [activePlayer?.controller, cpu, game]);
   const hoverLocation = (locationId: LocationId | null) => {
     setHoveredLocationId(locationId);
   };
@@ -1611,6 +1684,9 @@ export function App() {
                 onPinLocation={pinLocation}
                 onPlaceAtLocation={placeAtLocation}
                 pinnedLocationId={pinnedLocationId}
+                recommendedAction={
+                  selectedDieId ? (movePreviews[0]?.action ?? null) : null
+                }
                 reducedMotion={reducedMotion}
                 selectedDieId={selectedDieId}
               />
@@ -1723,11 +1799,17 @@ export function App() {
               </div>
               {human && <MomentumMeter player={human} />}
               {human && activePlayer?.controller === 'human' && (
-                <MoveAdvisor
-                  previews={movePreviews}
-                  selectedDie={selectedDie}
-                  onCommit={submitHumanAction}
-                />
+                <>
+                  <MoveAdvisor
+                    previews={movePreviews}
+                    selectedDie={selectedDie}
+                    onCommit={submitHumanAction}
+                  />
+                  <RivalThreats
+                    previews={rivalPreviews}
+                    onInspect={pinLocation}
+                  />
+                </>
               )}
               <section className="turn-summary" aria-label="Current turn plan">
                 <div>

@@ -996,6 +996,97 @@ select {
 .move-yield .token-list {
   justify-content: flex-end;
 }
+.rival-threats {
+  display: grid;
+  gap: 0.32rem;
+  margin-top: 0.48rem;
+  padding: 0.5rem;
+  border: 1px solid #6b4338;
+  border-radius: 0.55rem;
+  background:
+    radial-gradient(circle at 100% 0, rgb(206 85 59 / 18%), transparent 44%),
+    #15100e;
+}
+.rival-threats.calm {
+  color: #b7a78f;
+}
+.rival-threats.calm strong,
+.rival-threats-head strong {
+  color: #ffc9ad;
+  font-size: 0.7rem;
+}
+.rival-threats.calm span,
+.rival-threats-head span {
+  color: #a99a83;
+  font-size: 0.58rem;
+}
+.rival-threats-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+.rival-threat {
+  display: grid;
+  grid-template-columns: 1.7rem minmax(0, 1fr);
+  gap: 0.38rem;
+  align-items: center;
+  width: 100%;
+  padding: 0.34rem;
+  border: 1px solid #4d342c;
+  border-radius: 0.42rem;
+  color: inherit;
+  background: #1c1411;
+  text-align: left;
+}
+.rival-threat:hover:not(:disabled),
+.rival-threat:focus-visible {
+  border-color: #ff9d72;
+  background:
+    linear-gradient(135deg, rgb(94 40 29 / 55%), transparent 72%), #211511;
+  transform: none;
+}
+.primary-threat {
+  border-color: #bb604c;
+  box-shadow: 0 0 0.8rem rgb(202 83 61 / 14%);
+}
+.rival-threat.bump {
+  border-color: #f0b15b;
+}
+.threat-mark {
+  display: grid;
+  min-height: 1.7rem;
+  border: 1px solid #9f594a;
+  border-radius: 999px;
+  color: #ffe0c7;
+  background: #6d241e;
+  font-size: 0.8rem;
+  font-weight: 950;
+  place-items: center;
+}
+.threat-mark.small {
+  color: #d8b990;
+  background: #342119;
+  font-size: 0.64rem;
+}
+.rival-threat strong {
+  display: block;
+  overflow: hidden;
+  color: #ffd9bf;
+  font-size: 0.64rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rival-threat em {
+  display: block;
+  overflow: hidden;
+  color: #ad9686;
+  font-size: 0.55rem;
+  font-style: normal;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .turn-summary {
   order: 1;
   display: grid;

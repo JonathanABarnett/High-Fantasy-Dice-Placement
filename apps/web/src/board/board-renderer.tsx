@@ -90,6 +90,10 @@ export interface BoardRendererProps {
   readonly game: GameState;
   readonly humanPlayerId: PlayerId;
   readonly selectedDieId: DieId | null;
+  readonly recommendedAction?: Extract<
+    GameAction,
+    { type: 'place-die' | 'bump-die' }
+  > | null;
   readonly legalActions: readonly GameAction[];
   readonly reducedMotion: boolean;
   readonly pinnedLocationId?: LocationId | null;
@@ -250,6 +254,7 @@ export function BoardRenderer(props: BoardRendererProps) {
       const openSlots = location.slots.filter((slot) => slot.isOpen !== false);
       const legal =
         props.selectedDieId !== null && legalLocationIds.has(location.id);
+      const recommended = props.recommendedAction?.locationId === location.id;
       const pinned = props.pinnedLocationId === location.id;
       const occupied = location.slots.filter(
         (slot) => slot.occupantDieId,
@@ -295,10 +300,41 @@ export function BoardRenderer(props: BoardRendererProps) {
         .stroke({
           color: !isActive ? 0x5d5d5d : legal ? 0x78efac : 0xc9a66a,
           width: legal ? 5 : pinned ? 4 : isActive ? 1 : 2,
-          alpha: legal ? 1 : pinned ? 0.95 : isActive ? 0.22 : 0.7,
+          alpha: recommended
+            ? 1
+            : legal
+              ? 1
+              : pinned
+                ? 0.95
+                : isActive
+                  ? 0.22
+                  : 0.7,
         });
       if (legal) pulseTargets.push(highlight);
       card.addChild(highlight);
+      if (recommended) {
+        card.addChild(
+          new Graphics()
+            .roundRect(-7, -7, CARD_WIDTH + 14, CARD_HEIGHT + 14, 24)
+            .stroke({ color: 0xffd36d, width: 6, alpha: 0.98 }),
+        );
+        const bestBadge = new Graphics()
+          .roundRect(12, 48, 92, 25, 12)
+          .fill({ color: 0x6a3f10, alpha: 0.98 })
+          .stroke({ color: 0xffd36d, width: 2, alpha: 1 });
+        const bestText = new Text({
+          text: '★ BEST ROUTE',
+          style: {
+            fill: 0xffedc7,
+            fontFamily: 'Arial',
+            fontSize: 10,
+            fontWeight: 'bold',
+          },
+        });
+        bestText.anchor.set(0.5);
+        bestText.position.set(58, 60.5);
+        card.addChild(bestBadge, bestText);
+      }
       if (pinned) {
         card.addChild(
           new Graphics()
@@ -455,6 +491,8 @@ export function BoardRenderer(props: BoardRendererProps) {
         const slotOpen = slot.isOpen !== false;
         const slotLegal = slotOpen && legalSlotIds.has(slot.id);
         const slotBumpable = bumpableSlotIds.has(slot.id);
+        const slotRecommended =
+          recommended && props.recommendedAction?.slotId === slot.id;
         const die = new Graphics().roundRect(
           x,
           SLOT_Y,
@@ -509,11 +547,13 @@ export function BoardRenderer(props: BoardRendererProps) {
             })
             .stroke({
               color: props.selectedDieId
-                ? slotLegal
-                  ? 0x78efac
-                  : 0xa85e50
+                ? slotRecommended
+                  ? 0xffd36d
+                  : slotLegal
+                    ? 0x78efac
+                    : 0xa85e50
                 : 0x8a7352,
-              width: slotLegal ? 4 : 2,
+              width: slotRecommended ? 5 : slotLegal ? 4 : 2,
               alpha: 1,
             });
           const requirement = new Text({
@@ -533,6 +573,7 @@ export function BoardRenderer(props: BoardRendererProps) {
           requirement.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y);
           card.addChild(die, requirement);
         }
+        if (slotRecommended) pulseTargets.push(die);
       });
 
       const occupancy = new Text({
@@ -559,6 +600,7 @@ export function BoardRenderer(props: BoardRendererProps) {
     props.humanPlayerId,
     props.legalActions,
     props.pinnedLocationId,
+    props.recommendedAction,
     props.reducedMotion,
     props.selectedDieId,
     ready,
