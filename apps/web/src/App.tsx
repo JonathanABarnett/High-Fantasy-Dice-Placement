@@ -71,6 +71,7 @@ import titleHeroArt from '../../../assets/generated/setup/title-hero-v1.webp';
 import cardMarketArt from '../../../assets/generated/ui/card-market-v1.webp';
 import forgeUpgradeArt from '../../../assets/generated/ui/forge-upgrade-v1.webp';
 import shatteredCrownQuestArt from '../../../assets/generated/ui/shattered-crown-quest-v1.webp';
+import tabletopFrameArt from '../../../assets/generated/ui/tabletop-frame-v1.webp';
 import victoryScoringArt from '../../../assets/generated/ui/victory-scoring-v1.webp';
 
 const SAVE_KEY = 'shattered-crown.debug-match.v4';
@@ -149,6 +150,12 @@ function encounterArtStyle(kind: keyof typeof ENCOUNTER_ART): CSSProperties {
 function panelArtStyle(asset: string): CSSProperties {
   return {
     '--panel-art': `url(${asset})`,
+  } as CSSProperties;
+}
+
+function tableArtStyle(): CSSProperties {
+  return {
+    '--tabletop-frame': `url(${tabletopFrameArt})`,
   } as CSSProperties;
 }
 
@@ -1753,7 +1760,10 @@ export function App() {
   }
 
   return (
-    <main className={`game-shell ${reducedMotion ? 'reduced-motion' : ''}`}>
+    <main
+      className={`game-shell ${reducedMotion ? 'reduced-motion' : ''}`}
+      style={tableArtStyle()}
+    >
       <header className="game-header" data-tutorial="header">
         <div>
           <p className="eyebrow">Six rounds to claim the crown</p>

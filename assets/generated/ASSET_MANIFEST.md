@@ -73,6 +73,10 @@ as subtle right-side background art behind code-rendered text and controls.
   adventure cards, deck, coins, scrolls, relics, ally and tactic props.
 - `ui/victory-scoring-v1.webp`: dawn-lit throne-hall scoring table with a
   partially restored crown, treasure, resources, relics, and forged plates.
+- `ui/tabletop-frame-v1.webp`: wide dark fantasy war-table surface with carved
+  blackened wood, aged brass/gold trim, leather texture, calm central area, and
+  subtle blue arcane accents. Used behind the main game shell to push the whole
+  screen toward a premium tabletop-board presentation.
 
 ## Shared generation constraints
 

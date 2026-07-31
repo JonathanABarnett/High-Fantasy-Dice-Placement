@@ -23,11 +23,11 @@ import boardMapUrl from '../../../../assets/generated/board/shattered-realms-map
 
 const BOARD_WIDTH = 1200;
 const BOARD_HEIGHT = 760;
-const CARD_WIDTH = 250;
-const CARD_HEIGHT = 184;
-const SLOT_SIZE = 42;
-const SLOT_Y = 132;
-const SLOT_GAP = 52;
+const CARD_WIDTH = 235;
+const CARD_HEIGHT = 152;
+const SLOT_SIZE = 38;
+const SLOT_Y = 108;
+const SLOT_GAP = 48;
 const SLOT_CENTER_Y = SLOT_Y + SLOT_SIZE / 2;
 
 interface BoardPoint {
@@ -81,19 +81,19 @@ const REGION_COLORS: Readonly<Record<string, number>> = {
 };
 
 const AFFINITY_GLYPHS: Readonly<Record<string, string>> = {
-  arcane: 'ARC',
-  martial: 'MAR',
-  nature: 'NAT',
-  influence: 'INF',
-  neutral: 'ANY',
+  arcane: '✦',
+  martial: '⚔',
+  nature: '❧',
+  influence: '⚑',
+  neutral: '◆',
 };
 
 const RESOURCE_GLYPHS: Readonly<Record<string, string>> = {
-  gold: 'GLD',
-  mana: 'MNA',
-  knowledge: 'KNO',
-  materials: 'MAT',
-  influence: 'INF',
+  gold: '◉',
+  mana: '♦',
+  knowledge: '▣',
+  materials: '⚒',
+  influence: '✦',
   victoryPoints: '★',
 };
 
@@ -315,17 +315,30 @@ export function BoardRenderer(props: BoardRendererProps) {
         card.position.set(point.x, point.y);
       });
 
+      const aura = new Graphics()
+        .ellipse(CARD_WIDTH / 2, CARD_HEIGHT / 2, CARD_WIDTH * 0.56, 62)
+        .fill({
+          color: locationColor(location.tags),
+          alpha: !isActive ? 0.03 : legal ? 0.22 : pinned ? 0.16 : 0.1,
+        })
+        .stroke({
+          color: legal ? 0x8bffc0 : pinned ? 0xf1c66f : 0xd0a65d,
+          width: legal ? 3 : pinned ? 2 : 1,
+          alpha: isActive ? 0.42 : 0.2,
+        });
+      card.addChild(aura);
+
       const highlight = new Graphics()
         .roundRect(0, 0, CARD_WIDTH, CARD_HEIGHT, 18)
         .fill({
           color: locationColor(location.tags),
           alpha: !isActive
-            ? 0.02
+            ? 0.01
             : legal
-              ? 0.3
+              ? 0.09
               : props.selectedDieId
-                ? 0.1
-                : 0.08,
+                ? 0.045
+                : 0.025,
         })
         .stroke({
           color: !isActive ? 0x5d5d5d : legal ? 0x78efac : 0xc9a66a,
@@ -349,7 +362,7 @@ export function BoardRenderer(props: BoardRendererProps) {
             .stroke({ color: 0xffd36d, width: 6, alpha: 0.98 }),
         );
         const bestBadge = new Graphics()
-          .roundRect(12, 48, 92, 25, 12)
+          .roundRect(12, 44, 92, 25, 12)
           .fill({ color: 0x6a3f10, alpha: 0.98 })
           .stroke({ color: 0xffd36d, width: 2, alpha: 1 });
         const bestText = new Text({
@@ -362,7 +375,7 @@ export function BoardRenderer(props: BoardRendererProps) {
           },
         });
         bestText.anchor.set(0.5);
-        bestText.position.set(58, 60.5);
+        bestText.position.set(58, 56.5);
         card.addChild(bestBadge, bestText);
       }
       if (pinned) {
@@ -458,7 +471,7 @@ export function BoardRenderer(props: BoardRendererProps) {
                   textFill: 0xf0b1a6,
                 };
         const badge = new Graphics()
-          .roundRect(164, 8, 78, 24, 12)
+          .roundRect(149, 8, 78, 24, 12)
           .fill({ color: badgeState.fill, alpha: 0.96 })
           .stroke({
             color: badgeState.stroke,
@@ -475,17 +488,17 @@ export function BoardRenderer(props: BoardRendererProps) {
           },
         });
         badgeText.anchor.set(0.5);
-        badgeText.position.set(203, 20);
+        badgeText.position.set(188, 20);
         card.addChild(badge, badgeText);
       }
 
       const plaque = new Graphics()
-        .roundRect(0, 82, CARD_WIDTH, 96, 13)
-        .fill({ color: 0x130f0d, alpha: 0.86 })
+        .roundRect(0, 70, CARD_WIDTH, 80, 13)
+        .fill({ color: 0x130f0d, alpha: 0.78 })
         .stroke({
           color: legal ? 0x78efac : 0xd0a65d,
           width: legal ? 3 : 2,
-          alpha: 0.9,
+          alpha: legal ? 0.95 : 0.76,
         });
       card.addChild(plaque);
 
@@ -498,10 +511,10 @@ export function BoardRenderer(props: BoardRendererProps) {
           fontWeight: 'bold',
           stroke: { color: 0x160f09, width: 3 },
           wordWrap: true,
-          wordWrapWidth: 225,
+          wordWrapWidth: 210,
         },
       });
-      name.position.set(12, 91);
+      name.position.set(12, 78);
       card.addChild(name);
 
       const rewards = new Text({
@@ -513,7 +526,7 @@ export function BoardRenderer(props: BoardRendererProps) {
           fontWeight: 'bold',
         },
       });
-      rewards.position.set(12, 114);
+      rewards.position.set(12, 99);
       card.addChild(rewards);
 
       location.slots.forEach((slot, slotIndex) => {
@@ -681,7 +694,7 @@ export function BoardRenderer(props: BoardRendererProps) {
         text: `${occupied}/${openSlots.length} slots`,
         style: { fill: 0xd6bd8f, fontFamily: 'Arial', fontSize: 10 },
       });
-      occupancy.position.set(190, 150);
+      occupancy.position.set(174, 132);
       card.addChild(occupancy);
       app.stage.addChild(card);
     });
