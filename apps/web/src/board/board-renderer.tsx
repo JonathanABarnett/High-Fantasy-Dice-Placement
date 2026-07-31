@@ -1003,6 +1003,15 @@ export function BoardRenderer(props: BoardRendererProps) {
                 }
                 pinRef.current(location.id);
               }}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                if (props.selectedDieId && canPlace) {
+                  placeRef.current(location.id, props.selectedDieId);
+                  return;
+                }
+                pinRef.current(location.id);
+              }}
               onBlur={() => hoverRef.current(null)}
               onFocus={() => hoverRef.current(location.id)}
               onMouseEnter={() => hoverRef.current(location.id)}

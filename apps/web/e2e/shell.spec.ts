@@ -85,10 +85,15 @@ test('pins location details and exposes preview icon explanations', async ({
 
   // The decision dock beneath the board is the canonical location display.
   const preview = page.locator('.decision-dock');
-  // The CPU acts on a timer, and each of its turns re-renders the board, which
-  // can swallow a click that lands mid-render. Retry the pin until it sticks.
+  // Pixi owns the visual map while this transparent semantic control owns
+  // keyboard/a11y input. Use its keyboard activation path so the test covers
+  // the same reliable input route as a keyboard player.
   await expect(async () => {
-    await page.getByRole('button', { name: 'Inspect Crystal Cavern' }).click();
+    const crystalCavern = page.getByRole('button', {
+      name: 'Inspect Crystal Cavern',
+    });
+    await crystalCavern.focus();
+    await crystalCavern.press('Enter');
     await expect(
       preview.getByRole('heading', { name: 'Crystal Cavern' }),
     ).toBeVisible({ timeout: 1000 });

@@ -736,6 +736,9 @@ select {
     filter var(--motion-medium) var(--motion-ease);
 }
 .pixi-board canvas {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
   display: block;
   width: 100% !important;
   max-width: none;
@@ -798,7 +801,9 @@ select {
 }
 .location-inspect-hotspot {
   position: absolute;
-  z-index: 2;
+  /* These are the semantic, keyboard-friendly layer above the Pixi canvas.
+     They must remain on top while Pixi redraws locations and ambient effects. */
+  z-index: 4;
   padding: 0;
   border: 0 !important;
   border-radius: 0.65rem;
@@ -821,6 +826,14 @@ select {
     0 0 0 999rem rgb(0 0 0 / 0%),
     0 0 1.2rem rgb(241 198 111 / 22%);
   transform: translateY(-2px);
+}
+.location-inspect-hotspot.placement-impact {
+  outline: 3px solid #fff0a0;
+  outline-offset: 5px;
+  box-shadow:
+    0 0 0 0.6rem rgb(255 201 91 / 19%),
+    0 0 2.7rem 0.5rem rgb(255 180 72 / 48%);
+  animation: region-impact 540ms var(--motion-pop);
 }
 .placement-guide {
   position: absolute;
@@ -1089,6 +1102,10 @@ select {
   flex-direction: column;
   min-height: 0;
   overflow: auto;
+  background:
+    linear-gradient(180deg, rgb(10 9 8 / 72%), rgb(16 13 11 / 94%)),
+    var(--dice-tray, none) center top / 100% auto no-repeat,
+    rgb(18 16 14 / 94%);
   scrollbar-color: #7d5b31 #17130f;
 }
 .dice-panel h2,
@@ -3088,6 +3105,84 @@ select {
   place-items: center;
   pointer-events: none;
 }
+.die-flight.rival-flight {
+  border-color: #ff9e80;
+  background: linear-gradient(145deg, #723229, #24110e);
+  box-shadow:
+    0 0 0.7rem rgb(224 93 66 / 50%),
+    0 0.8rem 1.8rem rgb(0 0 0 / 60%);
+}
+.reward-flight {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 61;
+  display: grid;
+  min-width: 2.9rem;
+  height: 2rem;
+  padding-inline: 0.38rem;
+  border: 1px solid #d8ae5f;
+  border-radius: 999px;
+  color: #fff2cb;
+  background: linear-gradient(145deg, #5c421d, #17120e);
+  box-shadow:
+    0 0 1.4rem rgb(243 187 76 / 46%),
+    0 0.7rem 1.4rem rgb(0 0 0 / 56%);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  place-items: center;
+  pointer-events: none;
+}
+.reward-gold {
+  border-color: #f3c558;
+}
+.reward-mana {
+  border-color: #75c8ff;
+}
+.reward-knowledge {
+  border-color: #e7dfc9;
+}
+.reward-materials {
+  border-color: #df9a62;
+}
+.reward-influence {
+  border-color: #dc91ff;
+}
+.resource-token.placement-impact {
+  animation: resource-arrive 540ms var(--motion-pop);
+}
 .reduced-motion .die-flight {
   display: none;
+}
+.reduced-motion .reward-flight {
+  display: none;
+}
+@keyframes region-impact {
+  0% {
+    opacity: 0.25;
+    transform: scale(0.86);
+  }
+  48% {
+    opacity: 1;
+    transform: scale(1.07);
+  }
+  100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+}
+@keyframes resource-arrive {
+  0% {
+    filter: brightness(1);
+    transform: translateY(0) scale(1);
+  }
+  45% {
+    filter: brightness(1.85) drop-shadow(0 0 0.65rem #f7cf71);
+    transform: translateY(-0.18rem) scale(1.2);
+  }
+  100% {
+    filter: brightness(1);
+    transform: translateY(0) scale(1);
+  }
 }

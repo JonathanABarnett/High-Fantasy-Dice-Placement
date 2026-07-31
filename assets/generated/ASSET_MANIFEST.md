@@ -80,6 +80,9 @@ as subtle right-side background art behind code-rendered text and controls.
 - `ui/atlas-ornament-v1.webp`: wide low-contrast antique-gold compass rose,
   cartographer filigree, constellation lines, and restrained arcane glints for
   the interactive realm board overlay.
+- `ui/dice-tray-v1.webp`: blackened walnut and oxblood leather dice tray with
+  antique-gold corners and subtle blue arcane inlay, used behind the player's
+  physical dice area.
 
 ## Shared generation constraints
 

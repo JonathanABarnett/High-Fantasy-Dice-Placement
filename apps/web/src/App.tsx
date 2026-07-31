@@ -1,6 +1,7 @@
 import {
   type CSSProperties,
   type ReactNode,
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -73,6 +74,7 @@ import forgeUpgradeArt from '../../../assets/generated/ui/forge-upgrade-v1.webp'
 import shatteredCrownQuestArt from '../../../assets/generated/ui/shattered-crown-quest-v1.webp';
 import tabletopFrameArt from '../../../assets/generated/ui/tabletop-frame-v1.webp';
 import atlasOrnamentArt from '../../../assets/generated/ui/atlas-ornament-v1.webp';
+import diceTrayArt from '../../../assets/generated/ui/dice-tray-v1.webp';
 import victoryScoringArt from '../../../assets/generated/ui/victory-scoring-v1.webp';
 
 const SAVE_KEY = 'shattered-crown.debug-match.v4';
@@ -159,6 +161,10 @@ function tableArtStyle(): CSSProperties {
     '--tabletop-frame': `url(${tabletopFrameArt})`,
     '--atlas-ornament': `url(${atlasOrnamentArt})`,
   } as CSSProperties;
+}
+
+function diceTrayStyle(): CSSProperties {
+  return { '--dice-tray': `url(${diceTrayArt})` } as CSSProperties;
 }
 
 function describeEvent(event: GameEvent, state: GameState): string {
@@ -802,6 +808,13 @@ function ForgeFacePreview({
 }
 
 const FLIGHT_MS = 420;
+const RESOURCE_FLIGHT_SYMBOLS: Readonly<Record<ResourceType, string>> = {
+  gold: '◉',
+  mana: '♦',
+  knowledge: '▣',
+  materials: '⚒',
+  influence: '✦',
+};
 
 /**
  * Throws a copy of a die from the tray to the board slot it was committed to.
@@ -811,23 +824,19 @@ const FLIGHT_MS = 420;
  * hundred milliseconds; a detached node owns its own lifetime and cannot be
  * torn down mid-flight by an unrelated render. It removes itself when done.
  */
-function throwDieToBoard(
-  dieId: DieId,
-  locationId: LocationId,
+function throwPiece(
+  sourceSelector: string,
+  targetSelector: string,
   label: string,
-  affinity: string,
+  className: string,
 ): void {
-  const source = document.querySelector<HTMLElement>(
-    `[data-die-id="${dieId}"]`,
-  );
-  const target = document.querySelector<HTMLElement>(
-    `[data-testid="location-hotspot-${locationId}"]`,
-  );
+  const source = document.querySelector<HTMLElement>(sourceSelector);
+  const target = document.querySelector<HTMLElement>(targetSelector);
   if (!source || !target) return;
   const from = source.getBoundingClientRect();
   const to = target.getBoundingClientRect();
   const node = document.createElement('div');
-  node.className = `die-flight die-${affinity}`;
+  node.className = className;
   node.setAttribute('aria-hidden', 'true');
   node.textContent = label;
   document.body.appendChild(node);
@@ -846,6 +855,39 @@ function throwDieToBoard(
   );
   animation.onfinish = () => node.remove();
   animation.oncancel = () => node.remove();
+  target.classList.add('placement-impact');
+  window.setTimeout(
+    () => target.classList.remove('placement-impact'),
+    FLIGHT_MS,
+  );
+}
+
+function throwDieToBoard(
+  dieId: DieId,
+  locationId: LocationId,
+  label: string,
+  affinity: string,
+): void {
+  throwPiece(
+    `[data-die-id="${dieId}"]`,
+    `[data-testid="location-hotspot-${locationId}"]`,
+    label,
+    `die-flight die-${affinity}`,
+  );
+}
+
+function throwRewardToPlayer(
+  locationId: LocationId,
+  playerId: PlayerId,
+  resource: ResourceType,
+  amount: number,
+): void {
+  throwPiece(
+    `[data-testid="location-hotspot-${locationId}"]`,
+    `[data-player-id="${playerId}"] .resource-${resource}`,
+    `+${amount} ${RESOURCE_FLIGHT_SYMBOLS[resource]}`,
+    `reward-flight reward-${resource}`,
+  );
 }
 
 /**
@@ -1506,6 +1548,55 @@ export function App() {
     if (headline) setCallout({ ...headline, key: nextState.eventSequence });
   };
 
+  const launchActionFeedback = useCallback(
+    (before: GameState, events: readonly GameEvent[]) => {
+      if (reducedMotion) return;
+      const placement = events.find(
+        (event): event is Extract<GameEvent, { type: 'die-placed' }> =>
+          event.type === 'die-placed',
+      );
+      if (!placement) return;
+      const actor = before.players.find(
+        (player) => player.id === placement.playerId,
+      );
+      const die = actor?.dice.find((item) => item.id === placement.dieId);
+      if (actor?.controller === 'human') {
+        throwDieToBoard(
+          placement.dieId,
+          placement.locationId,
+          die ? String(dieValue(die)) : '',
+          die?.affinity ?? 'neutral',
+        );
+      } else {
+        throwPiece(
+          `[data-player-id="${placement.playerId}"] .faction-portrait`,
+          `[data-testid="location-hotspot-${placement.locationId}"]`,
+          die ? String(dieValue(die)) : '◆',
+          `die-flight die-${die?.affinity ?? 'martial'} rival-flight`,
+        );
+      }
+      window.setTimeout(
+        () => {
+          for (const event of events) {
+            if (
+              event.type === 'resource-gained' &&
+              event.playerId === placement.playerId
+            ) {
+              throwRewardToPlayer(
+                placement.locationId,
+                event.playerId,
+                event.resource,
+                event.amount,
+              );
+            }
+          }
+        },
+        Math.round(FLIGHT_MS * 0.55),
+      );
+    },
+    [reducedMotion],
+  );
+
   const startMatch = (guided = false) => {
     const selectedIndex = factions.findIndex(
       (faction) => faction.id === selectedFaction,
@@ -1538,21 +1629,11 @@ export function App() {
       return;
     }
     const result = applyAction(game, action);
+    launchActionFeedback(game, result.events);
     setGame(result.state);
     appendEvents(result.events, result.state);
     setSelectedDieId(null);
     setError(null);
-  };
-
-  const launchDieFlight = (dieId: DieId, locationId: LocationId) => {
-    if (reducedMotion || !human) return;
-    const die = human.dice.find((item) => item.id === dieId);
-    throwDieToBoard(
-      dieId,
-      locationId,
-      die ? String(dieValue(die)) : '',
-      die?.affinity ?? 'neutral',
-    );
   };
 
   const placeAtLocation = (
@@ -1592,7 +1673,6 @@ export function App() {
       (candidate) => validateAction(game, candidate).legal,
     );
     if (legal) {
-      launchDieFlight(dieId, locationId);
       submitHumanAction(legal);
       if (
         legal.type === 'place-die' &&
@@ -1621,11 +1701,12 @@ export function App() {
     const timer = window.setTimeout(() => {
       if (game.id !== matchId || game.turn.turnNumber !== turnNumber) return;
       const result = applyAction(game, chooseCpuAction(game, difficulty));
+      launchActionFeedback(game, result.events);
       setGame(result.state);
       appendEvents(result.events, result.state);
     }, 220);
     return () => window.clearTimeout(timer);
-  }, [activePlayer?.controller, difficulty, game]);
+  }, [activePlayer?.controller, difficulty, game, launchActionFeedback]);
 
   const saveMatch = () => {
     if (!game) return;
@@ -1814,6 +1895,7 @@ export function App() {
                 : 'player'
             }
             key={player.id}
+            data-player-id={player.id}
           >
             <img
               alt=""
@@ -1978,7 +2060,7 @@ export function App() {
           </section>
 
           <aside className="sidebar" data-tutorial="war-table">
-            <section className="dice-panel">
+            <section className="dice-panel" style={diceTrayStyle()}>
               <h2>Your dice</h2>
               <p>Select a ready die, then choose a highlighted slot.</p>
               <div className="dice" data-tutorial="dice">
