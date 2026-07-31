@@ -2153,311 +2153,6 @@ export function App() {
                   {error}
                 </p>
               )}
-              {pressure && (
-                <CollapsiblePanel
-                  ariaLabel="Round pressure"
-                  className="pressure-panel"
-                  contentId="round-pressure-panel"
-                  open={activePanel === 'pressure'}
-                  summary={
-                    <>
-                      {pressure.remainingSlots}/{pressure.totalOpenSlots} slots
-                      left
-                    </>
-                  }
-                  title="Round pressure"
-                  onToggle={() => showPanel('pressure')}
-                >
-                  <div className="pressure-grid">
-                    <span>
-                      <strong>{pressure.openLocations}</strong>
-                      open regions
-                    </span>
-                    <span>
-                      <strong>{pressure.sealedLocations}</strong>
-                      sealed regions
-                    </span>
-                    <span>
-                      <strong>{pressure.readyDiceWithRoutes}</strong>
-                      playable dice
-                    </span>
-                    <span>
-                      <strong>{pressure.lowRollRoutes}</strong>
-                      low-roll routes
-                    </span>
-                  </div>
-                  <p>
-                    {pressure.lowDice > 0
-                      ? `${pressure.lowDiceWithRoutes}/${pressure.lowDice} low dice still have a legal route.`
-                      : 'No low dice rolled right now.'}
-                  </p>
-                </CollapsiblePanel>
-              )}
-              {game.objectives.length > 0 && (
-                <CollapsiblePanel
-                  ariaLabel="Crown quests"
-                  className="quest-panel"
-                  contentId="crown-quests-panel"
-                  dataTutorial="quests"
-                  open={activePanel === 'quests'}
-                  summary={
-                    <>
-                      {
-                        game.objectives.filter(
-                          (item) => item.claimedBy === null,
-                        ).length
-                      }{' '}
-                      unclaimed
-                    </>
-                  }
-                  style={panelArtStyle(shatteredCrownQuestArt)}
-                  title="Crown Quests"
-                  onToggle={() => showPanel('quests')}
-                >
-                  <ul className="quest-list">
-                    {game.objectives.map((objective) => {
-                      const claimant = game.players.find(
-                        (player) => player.id === objective.claimedBy,
-                      );
-                      const mine = objective.claimedBy === human?.id;
-                      return (
-                        <li
-                          className={
-                            claimant
-                              ? mine
-                                ? 'quest claimed-by-you'
-                                : 'quest claimed-by-rival'
-                              : 'quest'
-                          }
-                          key={objective.id}
-                        >
-                          <div className="quest-title">
-                            <strong>{objective.name}</strong>
-                            <ResourceToken
-                              compact
-                              resource="victoryPoints"
-                              value={objective.victoryPoints}
-                            />
-                          </div>
-                          <p>{objective.description}</p>
-                          <em>
-                            {claimant
-                              ? `${mine ? '✓ Claimed by you' : `Claimed by ${claimant.name}`}`
-                              : 'Unclaimed — first to finish takes it'}
-                          </em>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </CollapsiblePanel>
-              )}
-              <CollapsiblePanel
-                className="card-panel"
-                aria-label="Card hand and market"
-                contentId="cards-market-panel"
-                dataTutorial="cards"
-                open={activePanel === 'cards'}
-                summary={`${human?.hand.length ?? 0} hand · ${game.cardDeck.length} deck`}
-                style={panelArtStyle(cardMarketArt)}
-                title="Cards and market"
-                onToggle={() => showPanel('cards')}
-              >
-                <div className="panel-heading">
-                  <h3>Your hand</h3>
-                  <span>{human?.hand.length ?? 0} cards</span>
-                </div>
-                <div className="card-list">
-                  {human?.hand.map((cardId, index) => {
-                    const card = game.cards.find((item) => item.id === cardId);
-                    if (!card) return null;
-                    const action: GameAction = {
-                      type: 'play-card',
-                      playerId: human.id,
-                      cardId,
-                      ...(card.target === 'ready-die' && selectedDieId
-                        ? { targetDieId: selectedDieId }
-                        : {}),
-                    };
-                    const legal = validateAction(game, action).legal;
-                    return (
-                      <article
-                        className="game-card hand-card"
-                        key={`${cardId}-${index}`}
-                        style={cardArtStyle(card.category)}
-                      >
-                        <strong>{card.name}</strong>
-                        <CategoryToken category={card.category} />
-                        <p>{card.rulesText}</p>
-                        <small className="card-cost">
-                          <span>Cost</span>
-                          <ResourceList values={card.cost} />
-                        </small>
-                        <button
-                          disabled={
-                            !legal || activePlayer?.controller !== 'human'
-                          }
-                          onClick={() => submitHumanAction(action)}
-                          type="button"
-                        >
-                          {card.target === 'ready-die'
-                            ? 'Play on selected die'
-                            : 'Play card'}
-                        </button>
-                      </article>
-                    );
-                  })}
-                  {!human?.hand.length && (
-                    <p className="empty-state">No cards in hand.</p>
-                  )}
-                </div>
-
-                <div className="panel-heading market-heading">
-                  <h3>Market</h3>
-                  <span>{game.cardDeck.length} in deck</span>
-                </div>
-                <div className="card-list">
-                  {game.cardMarket.map((cardId, index) => {
-                    const card = game.cards.find((item) => item.id === cardId);
-                    if (!card || !human) return null;
-                    const action: GameAction = {
-                      type: 'acquire-card',
-                      playerId: human.id,
-                      cardId,
-                    };
-                    const legal = validateAction(game, action).legal;
-                    return (
-                      <article
-                        className="game-card market-card"
-                        key={`${cardId}-${index}`}
-                        style={cardArtStyle(card.category)}
-                      >
-                        <strong>{card.name}</strong>
-                        <CategoryToken category={card.category} />
-                        <p>{card.rulesText}</p>
-                        <small className="card-cost">
-                          <span>Cost</span>
-                          <ResourceList values={card.cost} />
-                        </small>
-                        <button
-                          disabled={
-                            !legal || activePlayer?.controller !== 'human'
-                          }
-                          onClick={() => submitHumanAction(action)}
-                          type="button"
-                        >
-                          Acquire
-                        </button>
-                      </article>
-                    );
-                  })}
-                </div>
-              </CollapsiblePanel>
-
-              {forgeUnlocked && human && (
-                <CollapsiblePanel
-                  ariaLabel="Forge upgrades"
-                  className="forge-panel"
-                  contentId="forge-upgrades-panel"
-                  open={activePanel === 'forge'}
-                  summary="Permanent upgrades"
-                  style={panelArtStyle(forgeUpgradeArt)}
-                  title="Forge Hall"
-                  onToggle={() => showPanel('forge')}
-                >
-                  <div className="forge-controls">
-                    <label>
-                      Die
-                      <select
-                        value={upgradeDieId ?? ''}
-                        onChange={(event) =>
-                          setUpgradeDieId(event.target.value as DieId)
-                        }
-                      >
-                        {human.dice.map((die, index) => (
-                          <option key={die.id} value={die.id}>
-                            Die {index + 1} · {die.affinity}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      Face to replace
-                      <select
-                        value={upgradeFaceIndex}
-                        onChange={(event) =>
-                          setUpgradeFaceIndex(Number(event.target.value))
-                        }
-                      >
-                        {(
-                          human.dice.find((die) => die.id === upgradeDieId)
-                            ?.faces ??
-                          human.dice[0]?.faces ??
-                          []
-                        ).map((face, index) => (
-                          <option key={index} value={index}>
-                            Face {index + 1}: value {face.value}
-                            {face.symbols.length
-                              ? ` · ${face.symbols.join(', ')}`
-                              : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                  <div className="upgrade-list">
-                    {game.upgrades.map((upgrade) => {
-                      const currentFace =
-                        human.dice.find((die) => die.id === upgradeDieId)
-                          ?.faces[upgradeFaceIndex] ?? human.dice[0]?.faces[0];
-                      const action: GameAction | null = upgradeDieId
-                        ? {
-                            type: 'upgrade-die',
-                            playerId: human.id,
-                            dieId: upgradeDieId,
-                            faceIndex: upgradeFaceIndex,
-                            upgradeId: upgrade.id,
-                          }
-                        : null;
-                      const legal = action
-                        ? validateAction(game, action).legal
-                        : false;
-                      return (
-                        <article className="upgrade" key={upgrade.id}>
-                          <ForgeFacePreview
-                            currentFace={currentFace}
-                            replacement={upgrade.replacement}
-                          />
-                          <div>
-                            <strong>{upgrade.name}</strong>
-                            <p>{upgrade.description}</p>
-                            <small>
-                              <span className="upgrade-meta">
-                                <span>Cost</span>
-                                <ResourceList values={upgrade.cost} />
-                                <span>Scores</span>
-                                <ResourceToken
-                                  compact
-                                  resource="victoryPoints"
-                                  value={upgrade.scoreValue}
-                                />
-                              </span>
-                            </small>
-                          </div>
-                          <button
-                            disabled={
-                              !legal || activePlayer?.controller !== 'human'
-                            }
-                            onClick={() => action && submitHumanAction(action)}
-                            type="button"
-                          >
-                            Forge
-                          </button>
-                        </article>
-                      );
-                    })}
-                  </div>
-                </CollapsiblePanel>
-              )}
               {selectedDieId && human && (
                 <details className="accessible-actions">
                   <summary>Keyboard placement options</summary>
@@ -2487,6 +2182,311 @@ export function App() {
                 </details>
               )}
             </section>
+            {pressure && (
+              <CollapsiblePanel
+                ariaLabel="Round pressure"
+                className="pressure-panel"
+                contentId="round-pressure-panel"
+                open={activePanel === 'pressure'}
+                summary={
+                  <>
+                    {pressure.remainingSlots}/{pressure.totalOpenSlots} slots
+                    left
+                  </>
+                }
+                title="Round pressure"
+                onToggle={() => showPanel('pressure')}
+              >
+                <div className="pressure-grid">
+                  <span>
+                    <strong>{pressure.openLocations}</strong>
+                    open regions
+                  </span>
+                  <span>
+                    <strong>{pressure.sealedLocations}</strong>
+                    sealed regions
+                  </span>
+                  <span>
+                    <strong>{pressure.readyDiceWithRoutes}</strong>
+                    playable dice
+                  </span>
+                  <span>
+                    <strong>{pressure.lowRollRoutes}</strong>
+                    low-roll routes
+                  </span>
+                </div>
+                <p>
+                  {pressure.lowDice > 0
+                    ? `${pressure.lowDiceWithRoutes}/${pressure.lowDice} low dice still have a legal route.`
+                    : 'No low dice rolled right now.'}
+                </p>
+              </CollapsiblePanel>
+            )}
+            {game.objectives.length > 0 && (
+              <CollapsiblePanel
+                ariaLabel="Crown quests"
+                className="quest-panel"
+                contentId="crown-quests-panel"
+                dataTutorial="quests"
+                open={activePanel === 'quests'}
+                summary={
+                  <>
+                    {
+                      game.objectives.filter((item) => item.claimedBy === null)
+                        .length
+                    }{' '}
+                    unclaimed
+                  </>
+                }
+                style={panelArtStyle(shatteredCrownQuestArt)}
+                title="Crown Quests"
+                onToggle={() => showPanel('quests')}
+              >
+                <ul className="quest-list">
+                  {game.objectives.map((objective) => {
+                    const claimant = game.players.find(
+                      (player) => player.id === objective.claimedBy,
+                    );
+                    const mine = objective.claimedBy === human?.id;
+                    return (
+                      <li
+                        className={
+                          claimant
+                            ? mine
+                              ? 'quest claimed-by-you'
+                              : 'quest claimed-by-rival'
+                            : 'quest'
+                        }
+                        key={objective.id}
+                      >
+                        <div className="quest-title">
+                          <strong>{objective.name}</strong>
+                          <ResourceToken
+                            compact
+                            resource="victoryPoints"
+                            value={objective.victoryPoints}
+                          />
+                        </div>
+                        <p>{objective.description}</p>
+                        <em>
+                          {claimant
+                            ? `${mine ? '✓ Claimed by you' : `Claimed by ${claimant.name}`}`
+                            : 'Unclaimed — first to finish takes it'}
+                        </em>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </CollapsiblePanel>
+            )}
+            <CollapsiblePanel
+              className="card-panel"
+              aria-label="Card hand and market"
+              contentId="cards-market-panel"
+              dataTutorial="cards"
+              open={activePanel === 'cards'}
+              summary={`${human?.hand.length ?? 0} hand · ${game.cardDeck.length} deck`}
+              style={panelArtStyle(cardMarketArt)}
+              title="Cards and market"
+              onToggle={() => showPanel('cards')}
+            >
+              <div className="panel-heading">
+                <h3>Your hand</h3>
+                <span>{human?.hand.length ?? 0} cards</span>
+              </div>
+              <div className="card-list">
+                {human?.hand.map((cardId, index) => {
+                  const card = game.cards.find((item) => item.id === cardId);
+                  if (!card) return null;
+                  const action: GameAction = {
+                    type: 'play-card',
+                    playerId: human.id,
+                    cardId,
+                    ...(card.target === 'ready-die' && selectedDieId
+                      ? { targetDieId: selectedDieId }
+                      : {}),
+                  };
+                  const legal = validateAction(game, action).legal;
+                  return (
+                    <article
+                      className="game-card hand-card"
+                      key={`${cardId}-${index}`}
+                      style={cardArtStyle(card.category)}
+                    >
+                      <strong>{card.name}</strong>
+                      <CategoryToken category={card.category} />
+                      <p>{card.rulesText}</p>
+                      <small className="card-cost">
+                        <span>Cost</span>
+                        <ResourceList values={card.cost} />
+                      </small>
+                      <button
+                        disabled={
+                          !legal || activePlayer?.controller !== 'human'
+                        }
+                        onClick={() => submitHumanAction(action)}
+                        type="button"
+                      >
+                        {card.target === 'ready-die'
+                          ? 'Play on selected die'
+                          : 'Play card'}
+                      </button>
+                    </article>
+                  );
+                })}
+                {!human?.hand.length && (
+                  <p className="empty-state">No cards in hand.</p>
+                )}
+              </div>
+
+              <div className="panel-heading market-heading">
+                <h3>Market</h3>
+                <span>{game.cardDeck.length} in deck</span>
+              </div>
+              <div className="card-list">
+                {game.cardMarket.map((cardId, index) => {
+                  const card = game.cards.find((item) => item.id === cardId);
+                  if (!card || !human) return null;
+                  const action: GameAction = {
+                    type: 'acquire-card',
+                    playerId: human.id,
+                    cardId,
+                  };
+                  const legal = validateAction(game, action).legal;
+                  return (
+                    <article
+                      className="game-card market-card"
+                      key={`${cardId}-${index}`}
+                      style={cardArtStyle(card.category)}
+                    >
+                      <strong>{card.name}</strong>
+                      <CategoryToken category={card.category} />
+                      <p>{card.rulesText}</p>
+                      <small className="card-cost">
+                        <span>Cost</span>
+                        <ResourceList values={card.cost} />
+                      </small>
+                      <button
+                        disabled={
+                          !legal || activePlayer?.controller !== 'human'
+                        }
+                        onClick={() => submitHumanAction(action)}
+                        type="button"
+                      >
+                        Acquire
+                      </button>
+                    </article>
+                  );
+                })}
+              </div>
+            </CollapsiblePanel>
+
+            {forgeUnlocked && human && (
+              <CollapsiblePanel
+                ariaLabel="Forge upgrades"
+                className="forge-panel"
+                contentId="forge-upgrades-panel"
+                open={activePanel === 'forge'}
+                summary="Permanent upgrades"
+                style={panelArtStyle(forgeUpgradeArt)}
+                title="Forge Hall"
+                onToggle={() => showPanel('forge')}
+              >
+                <div className="forge-controls">
+                  <label>
+                    Die
+                    <select
+                      value={upgradeDieId ?? ''}
+                      onChange={(event) =>
+                        setUpgradeDieId(event.target.value as DieId)
+                      }
+                    >
+                      {human.dice.map((die, index) => (
+                        <option key={die.id} value={die.id}>
+                          Die {index + 1} · {die.affinity}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Face to replace
+                    <select
+                      value={upgradeFaceIndex}
+                      onChange={(event) =>
+                        setUpgradeFaceIndex(Number(event.target.value))
+                      }
+                    >
+                      {(
+                        human.dice.find((die) => die.id === upgradeDieId)
+                          ?.faces ??
+                        human.dice[0]?.faces ??
+                        []
+                      ).map((face, index) => (
+                        <option key={index} value={index}>
+                          Face {index + 1}: value {face.value}
+                          {face.symbols.length
+                            ? ` · ${face.symbols.join(', ')}`
+                            : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="upgrade-list">
+                  {game.upgrades.map((upgrade) => {
+                    const currentFace =
+                      human.dice.find((die) => die.id === upgradeDieId)?.faces[
+                        upgradeFaceIndex
+                      ] ?? human.dice[0]?.faces[0];
+                    const action: GameAction | null = upgradeDieId
+                      ? {
+                          type: 'upgrade-die',
+                          playerId: human.id,
+                          dieId: upgradeDieId,
+                          faceIndex: upgradeFaceIndex,
+                          upgradeId: upgrade.id,
+                        }
+                      : null;
+                    const legal = action
+                      ? validateAction(game, action).legal
+                      : false;
+                    return (
+                      <article className="upgrade" key={upgrade.id}>
+                        <ForgeFacePreview
+                          currentFace={currentFace}
+                          replacement={upgrade.replacement}
+                        />
+                        <div>
+                          <strong>{upgrade.name}</strong>
+                          <p>{upgrade.description}</p>
+                          <small>
+                            <span className="upgrade-meta">
+                              <span>Cost</span>
+                              <ResourceList values={upgrade.cost} />
+                              <span>Scores</span>
+                              <ResourceToken
+                                compact
+                                resource="victoryPoints"
+                                value={upgrade.scoreValue}
+                              />
+                            </span>
+                          </small>
+                        </div>
+                        <button
+                          disabled={
+                            !legal || activePlayer?.controller !== 'human'
+                          }
+                          onClick={() => action && submitHumanAction(action)}
+                          type="button"
+                        >
+                          Forge
+                        </button>
+                      </article>
+                    );
+                  })}
+                </div>
+              </CollapsiblePanel>
+            )}
             <CollapsiblePanel
               className="log-panel"
               contentId="match-log-panel"
