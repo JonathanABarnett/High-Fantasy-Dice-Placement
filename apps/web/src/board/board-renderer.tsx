@@ -302,7 +302,18 @@ export function BoardRenderer(props: BoardRendererProps) {
         }
         pinRef.current(location.id);
       });
-      card.on('pointerover', () => hoverRef.current(location.id));
+      card.on('pointerover', () => {
+        hoverRef.current(location.id);
+        if (!props.reducedMotion && isActive) {
+          card.scale.set(1.018);
+          card.position.set(point.x - 2, point.y - 3);
+        }
+      });
+      card.on('pointerout', () => {
+        hoverRef.current(null);
+        card.scale.set(1);
+        card.position.set(point.x, point.y);
+      });
 
       const highlight = new Graphics()
         .roundRect(0, 0, CARD_WIDTH, CARD_HEIGHT, 18)

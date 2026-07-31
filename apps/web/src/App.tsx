@@ -1844,6 +1844,31 @@ export function App() {
         ))}
       </section>
 
+      <section className="crown-track" aria-label="Score track">
+        <div className="track-line" aria-hidden="true">
+          {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45].map((mark) => (
+            <span className="track-mark" key={mark}>
+              <i>{mark}</i>
+            </span>
+          ))}
+        </div>
+        {game.players.map((player) => {
+          const score = scoreTotal(game, player.id);
+          const capped = Math.max(0, Math.min(45, score));
+          return (
+            <span
+              className={`track-token track-token-${player.controller}`}
+              key={player.id}
+              style={{ left: `${(capped / 45) * 100}%` }}
+              title={`${player.name}: ${score}★`}
+            >
+              <img alt="" src={FACTION_PORTRAITS[player.factionId]} />
+              <strong>{score}</strong>
+            </span>
+          );
+        })}
+      </section>
+
       {game.phase === 'complete' ? (
         <section
           className="score-panel"
