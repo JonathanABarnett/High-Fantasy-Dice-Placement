@@ -149,6 +149,65 @@ function rewardLabel(
     .join('   ');
 }
 
+function pipPositions(value: number): readonly [number, number][] {
+  const low = 0.28;
+  const mid = 0.5;
+  const high = 0.72;
+  switch (Math.max(1, Math.min(6, value))) {
+    case 1:
+      return [[mid, mid]];
+    case 2:
+      return [
+        [low, low],
+        [high, high],
+      ];
+    case 3:
+      return [
+        [low, low],
+        [mid, mid],
+        [high, high],
+      ];
+    case 4:
+      return [
+        [low, low],
+        [high, low],
+        [low, high],
+        [high, high],
+      ];
+    case 5:
+      return [
+        [low, low],
+        [high, low],
+        [mid, mid],
+        [low, high],
+        [high, high],
+      ];
+    default:
+      return [
+        [low, low],
+        [high, low],
+        [low, mid],
+        [high, mid],
+        [low, high],
+        [high, high],
+      ];
+  }
+}
+
+function drawDiePips(
+  target: Graphics,
+  x: number,
+  y: number,
+  value: number,
+  color: number,
+) {
+  for (const [ratioX, ratioY] of pipPositions(value)) {
+    target
+      .circle(x + SLOT_SIZE * ratioX, y + SLOT_SIZE * ratioY, 3.2)
+      .fill({ color, alpha: 0.94 });
+  }
+}
+
 function drawBackdrop(stage: Container, texture: Texture): void {
   const map = Sprite.from(texture);
   map.width = BOARD_WIDTH;
@@ -585,22 +644,58 @@ export function BoardRenderer(props: BoardRendererProps) {
           if (slotBumpable || occupantRaidDamage !== null) {
             pulseTargets.push(landingRing);
           }
-          die.fill({ color: human ? 0x397f5a : 0x9a4b3f }).stroke({
-            color: slotBumpable ? 0xffd24a : human ? 0xa9ffd0 : 0xffb29f,
-            width: slotBumpable ? 4 : 2,
-          });
-          const value = new Text({
+          die
+            .fill({ color: human ? 0x397f5a : 0x9a4b3f })
+            .stroke({
+              color: slotBumpable ? 0xffd24a : human ? 0xa9ffd0 : 0xffb29f,
+              width: slotBumpable ? 4 : 2,
+            })
+            .roundRect(x + 3, SLOT_Y + 3, SLOT_SIZE - 6, SLOT_SIZE - 6, 6)
+            .stroke({
+              color: human ? 0xd8ffe4 : 0xffd7cd,
+              width: 1,
+              alpha: 0.22,
+            });
+          if (occupantDie && dieValue(occupantDie) <= 6) {
+            drawDiePips(
+              die,
+              x,
+              SLOT_Y,
+              dieValue(occupantDie),
+              human ? 0xf2fff5 : 0xffede8,
+            );
+          }
+          const valueBadge = new Graphics()
+            .roundRect(x + SLOT_SIZE - 15, SLOT_Y - 5, 19, 15, 6)
+            .fill({ color: 0x120e0b, alpha: 0.92 })
+            .stroke({
+              color: slotBumpable ? 0xffd24a : human ? 0xa9ffd0 : 0xffb29f,
+              width: 1.5,
+              alpha: 0.95,
+            });
+          const valueBadgeText = new Text({
             text: occupantValue,
+            style: {
+              fill: 0xfff0c8,
+              fontFamily: 'Arial',
+              fontSize: 9,
+              fontWeight: 'bold',
+            },
+          });
+          valueBadgeText.anchor.set(0.5);
+          valueBadgeText.position.set(x + SLOT_SIZE - 5.5, SLOT_Y + 2.5);
+          const pipFallbackValue = new Text({
+            text: occupantDie && dieValue(occupantDie) > 6 ? occupantValue : '',
             style: {
               fill: 0xffffff,
               fontFamily: 'Georgia',
-              fontSize: 19,
+              fontSize: 18,
               fontWeight: 'bold',
               stroke: { color: 0x120d0b, width: 3 },
             },
           });
-          value.anchor.set(0.5);
-          value.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y - 5);
+          pipFallbackValue.anchor.set(0.5);
+          pipFallbackValue.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y - 4);
           const owner = new Text({
             text:
               occupantRaidDamage !== null
@@ -620,7 +715,13 @@ export function BoardRenderer(props: BoardRendererProps) {
           });
           owner.anchor.set(0.5);
           owner.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y + 13);
-          card.addChild(die, value, owner);
+          card.addChild(
+            die,
+            pipFallbackValue,
+            valueBadge,
+            valueBadgeText,
+            owner,
+          );
           if (slotBumpable) pulseTargets.push(die);
         } else {
           if (slotLegal) {

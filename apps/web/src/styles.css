@@ -1039,8 +1039,13 @@ select {
   place-content: center;
   overflow: visible;
   border-width: 2px;
-  background: linear-gradient(145deg, #392b20, #171411);
+  border-radius: 0.58rem;
+  background:
+    radial-gradient(circle at 30% 24%, rgb(255 255 255 / 18%), transparent 24%),
+    radial-gradient(circle at 78% 82%, rgb(0 0 0 / 32%), transparent 34%),
+    linear-gradient(145deg, #46311f, #171411);
   box-shadow:
+    0 0.45rem 0.8rem rgb(0 0 0 / 24%),
     inset 0.16rem 0.16rem 0 rgb(255 255 255 / 7%),
     inset -0.16rem -0.16rem 0 rgb(0 0 0 / 35%);
   transition:
@@ -1049,19 +1054,48 @@ select {
     box-shadow var(--motion-medium) var(--motion-ease),
     transform var(--motion-fast) var(--motion-pop);
 }
+.die::before {
+  position: absolute;
+  inset: 0.22rem;
+  border-radius: 0.42rem;
+  pointer-events: none;
+  content: '';
+  background: linear-gradient(
+    135deg,
+    rgb(255 255 255 / 14%),
+    transparent 42%,
+    rgb(0 0 0 / 18%)
+  );
+  opacity: 0.8;
+}
+.die:hover:not(:disabled),
+.die:focus-visible:not(:disabled) {
+  box-shadow:
+    0 0.65rem 1.1rem rgb(0 0 0 / 34%),
+    0 0 0.9rem rgb(229 184 95 / 14%),
+    inset 0.16rem 0.16rem 0 rgb(255 255 255 / 9%),
+    inset -0.16rem -0.16rem 0 rgb(0 0 0 / 35%);
+  transform: translateY(-0.18rem) rotate(-2deg);
+}
 .die strong {
+  position: relative;
+  z-index: 1;
   color: #fff0c7;
   font:
     700 1.18rem Georgia,
     serif;
 }
 .die .die-affinity {
+  position: relative;
+  z-index: 1;
   grid-column: 1 / -1;
   overflow: hidden;
   font-size: 0.55rem;
   text-overflow: ellipsis;
 }
 .die-glyph {
+  position: relative;
+  z-index: 1;
   display: inline-grid;
   width: 1.1rem;
   aspect-ratio: 1;
@@ -1102,6 +1136,7 @@ select {
 }
 .die-symbols {
   position: absolute;
+  z-index: 1;
   right: 0.22rem;
   bottom: 0.22rem;
   display: flex;
@@ -1138,6 +1173,7 @@ select {
 }
 .die-forged-badge {
   position: absolute;
+  z-index: 2;
   top: -0.28rem;
   right: -0.28rem;
   display: grid;
