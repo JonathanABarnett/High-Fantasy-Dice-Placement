@@ -66,6 +66,9 @@ test('explains resources and clearly marks die placement routes', async ({
   await materials.focus();
   await expect(materials).toBeFocused();
 
+  // The command trays begin closed so the realm stays dominant; opening Cards
+  // is the deliberate path to its item explanations.
+  await page.locator('.panel-shortcut').filter({ hasText: 'Cards' }).click();
   const category = page.locator('.category-token').first();
   await expect(category).toHaveAttribute('data-tooltip', /one-use effect/i);
 
@@ -188,6 +191,7 @@ test('plays a faction card through the typed effect system', async ({
 }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Start match' }).click();
+  await page.locator('.panel-shortcut').filter({ hasText: 'Cards' }).click();
   await expect(page.getByRole('heading', { name: 'Your hand' })).toBeVisible();
   await expect(page.getByText('Revelation of Stars')).toBeVisible();
   await page.getByRole('button', { name: 'Play card' }).click();

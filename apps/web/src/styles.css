@@ -290,7 +290,7 @@ select {
   gap: 0.55rem;
   max-width: 122rem;
   width: 100%;
-  margin: 0 auto 0.34rem;
+  margin: 0 auto 0.28rem;
 }
 .player {
   position: relative;
@@ -298,8 +298,8 @@ select {
   gap: 0.65rem;
   align-items: center;
   justify-content: space-between;
-  min-height: 4.2rem;
-  padding: 0.55rem 0.7rem;
+  min-height: 3.6rem;
+  padding: 0.42rem 0.58rem;
   border: 1px solid #3f362c;
   border-radius: 0.65rem;
   background:
@@ -636,16 +636,11 @@ select {
   transform: translate(-50%, calc(-50% + 0.55rem));
 }
 .play-area {
+  position: relative;
   display: grid;
-  grid-template-columns: clamp(17rem, 18vw, 22rem) minmax(0, 1fr) clamp(
-      18rem,
-      20vw,
-      24rem
-    );
-  grid-template-rows: minmax(0, 1fr) auto;
-  grid-template-areas:
-    'player-board realm support'
-    'hand-rail hand-rail hand-rail';
+  grid-template-columns: clamp(18rem, 20vw, 23rem) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: 'player-board realm';
   gap: 0.75rem;
   max-width: 122rem;
   width: 100%;
@@ -906,12 +901,13 @@ select {
 .decision-dock {
   position: absolute;
   z-index: 5;
-  right: 1rem;
-  bottom: 1.7rem;
-  left: 1rem;
+  right: 0.85rem;
+  bottom: 0.85rem;
+  left: auto;
   display: grid;
   gap: 0.35rem;
-  max-height: clamp(7rem, 19vh, 11rem);
+  width: min(25rem, calc(100% - 2rem));
+  max-height: min(24rem, calc(100% - 4.5rem));
   min-height: 0;
   padding: 0.55rem 0.65rem;
   border: 1px solid #5f4a2f;
@@ -926,6 +922,9 @@ select {
   scrollbar-color: #7d5b31 #17130f;
   backdrop-filter: blur(8px);
   animation: table-tray-rise 300ms var(--motion-pop);
+}
+.decision-dock:not(.is-pinned) {
+  display: none;
 }
 .decision-dock.is-pinned {
   border-color: #d4a85f;
@@ -1061,6 +1060,43 @@ select {
   gap: 0.55rem;
   align-content: start;
   min-height: 0;
+}
+
+/* Desktop war-table composition: the board remains the dominant object.
+   Optional systems are summoned as a tray over the table rather than forcing
+   the map to shrink into a dashboard column or a permanently open bottom row. */
+@media (min-width: 1051px) {
+  .pressure-panel.is-open,
+  .quest-panel.is-open,
+  .card-panel.is-open,
+  .forge-panel.is-open,
+  .log-panel.is-open {
+    position: absolute;
+    z-index: 12;
+    right: 0.8rem;
+    bottom: 0.8rem;
+    left: clamp(19rem, 21vw, 24rem);
+    max-height: min(22rem, calc(100% - 1.6rem));
+    margin: 0;
+    overflow: auto;
+    box-shadow:
+      0 1.25rem 3.5rem rgb(0 0 0 / 68%),
+      inset 0 0 0 1px rgb(255 225 160 / 7%);
+    backdrop-filter: blur(13px);
+  }
+  .pressure-panel.is-open,
+  .quest-panel.is-open,
+  .forge-panel.is-open,
+  .log-panel.is-open {
+    left: auto;
+    width: min(24rem, calc(100% - 21rem));
+  }
+  .card-panel.is-open {
+    width: auto;
+  }
+  .card-panel.is-open .collapsible-content {
+    grid-template-columns: minmax(13rem, 0.7fr) minmax(22rem, 1.7fr);
+  }
 }
 @media (min-width: 980px) {
   .sidebar {

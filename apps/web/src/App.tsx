@@ -1004,7 +1004,7 @@ const PANEL_SHORTCUTS: readonly {
 
 type CollapsiblePanelId = 'pressure' | 'quests' | 'cards' | 'forge' | 'log';
 
-type ActivePanelId = CollapsiblePanelId;
+type ActivePanelId = CollapsiblePanelId | null;
 
 function CollapsiblePanel({
   ariaLabel,
@@ -1389,7 +1389,9 @@ export function App() {
   const [tutorialCompleted, setTutorialCompleted] = useState(
     () => localStorage.getItem(TUTORIAL_KEY) === 'true',
   );
-  const [activePanel, setActivePanel] = useState<ActivePanelId>('cards');
+  // The realm is the game. Start with the optional information trays closed
+  // so a new turn reads as a board game, not as a dashboard of competing panes.
+  const [activePanel, setActivePanel] = useState<ActivePanelId>(null);
   const [tableFocus, setTableFocus] = useState(false);
   const reducedMotion = useInterfaceStore((state) => state.reducedMotion);
   const toggleReducedMotion = useInterfaceStore(
@@ -1478,7 +1480,8 @@ export function App() {
   const selectDieForPlanning = (dieId: DieId) => {
     setSelectedDieId(dieId);
   };
-  const showPanel = (panel: ActivePanelId) => setActivePanel(panel);
+  const showPanel = (panel: CollapsiblePanelId) =>
+    setActivePanel((current) => (current === panel ? null : panel));
   const pressure = useMemo(() => {
     if (!game || !human) return null;
     const openLocations = game.locations.filter(
@@ -2152,7 +2155,7 @@ export function App() {
                 })}
               </div>
               {human && <MomentumMeter player={human} />}
-              {human && activePlayer?.controller === 'human' && (
+              {human && selectedDie && activePlayer?.controller === 'human' && (
                 <>
                   <MoveAdvisor
                     previews={movePreviews}
