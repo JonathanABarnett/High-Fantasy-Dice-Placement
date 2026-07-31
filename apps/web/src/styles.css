@@ -700,6 +700,17 @@ select {
   transform: translateX(-18%);
   animation: table-sheen 9s ease-in-out infinite alternate;
 }
+.board-stage::after {
+  position: absolute;
+  z-index: 2;
+  inset: 7% 10%;
+  pointer-events: none;
+  content: '';
+  background: var(--atlas-ornament, none) center / contain no-repeat;
+  mix-blend-mode: screen;
+  opacity: 0.2;
+  animation: atlas-glimmer 9s ease-in-out infinite alternate;
+}
 .pixi-board {
   position: relative;
   z-index: 1;
@@ -730,6 +741,55 @@ select {
   max-width: none;
   height: 100% !important;
   touch-action: manipulation;
+}
+.atlas-nav {
+  position: absolute;
+  z-index: 6;
+  /* Keep camera controls above the contextual decision drawer, where they
+     remain reachable even while a location is pinned. */
+  bottom: clamp(8.8rem, 22vh, 12.8rem);
+  left: 1rem;
+  display: flex;
+  gap: 0.22rem;
+  align-items: center;
+  max-width: calc(100% - 2rem);
+  padding: 0.28rem;
+  overflow: auto hidden;
+  border: 1px solid rgb(183 140 67 / 72%);
+  border-radius: 999px;
+  color: #e7c174;
+  background: rgb(13 12 10 / 91%);
+  box-shadow: 0 0.7rem 1.8rem rgb(0 0 0 / 55%);
+  scrollbar-width: none;
+}
+.atlas-nav::-webkit-scrollbar {
+  display: none;
+}
+.atlas-nav > span {
+  padding: 0 0.3rem 0 0.42rem;
+  color: #a89779;
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.atlas-nav button {
+  flex: 0 0 auto;
+  padding: 0.25rem 0.46rem;
+  border-color: transparent;
+  border-radius: 999px;
+  color: #cfc1a7;
+  background: transparent;
+  font-size: 0.58rem;
+  font-weight: 800;
+}
+.atlas-nav button:hover:not(:disabled),
+.atlas-nav button.is-active {
+  border-color: #d7aa58;
+  color: #fff0c4;
+  background: linear-gradient(180deg, #62431f, #2c2015);
+  box-shadow: 0 0 0.7rem rgb(218 167 79 / 19%);
+  transform: none;
 }
 .tutorial-hotspot {
   position: absolute;
@@ -995,6 +1055,24 @@ select {
     overflow: visible;
     padding-right: 0.2rem;
     scrollbar-color: #7d5b31 #17130f;
+  }
+  .game-shell.table-focus .play-area {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'realm';
+  }
+  .game-shell.table-focus .dice-panel,
+  .game-shell.table-focus .pressure-panel,
+  .game-shell.table-focus .quest-panel,
+  .game-shell.table-focus .card-panel,
+  .game-shell.table-focus .forge-panel,
+  .game-shell.table-focus .log-panel {
+    display: none;
+  }
+  .game-shell.table-focus .board-stage {
+    padding: 0.65rem;
+  }
+  .game-shell.table-focus .pixi-board {
+    max-width: min(100%, 104rem);
   }
 }
 .dice-panel,
@@ -2777,6 +2855,16 @@ select {
   100% {
     opacity: 0.34;
     transform: translateX(18%);
+  }
+}
+@keyframes atlas-glimmer {
+  0% {
+    opacity: 0.1;
+    transform: scale(0.98) rotate(-0.4deg);
+  }
+  100% {
+    opacity: 0.25;
+    transform: scale(1.025) rotate(0.4deg);
   }
 }
 @keyframes guide-settle {

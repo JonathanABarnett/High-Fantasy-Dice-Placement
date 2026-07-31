@@ -32,6 +32,23 @@ test('starts a deterministic human-versus-CPU match', async ({ page }) => {
   await expect(page.locator('.log-panel')).toContainText('entries');
 });
 
+test('keeps the realm playable while using the atlas and board-focus mode', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Start match' }).click();
+
+  await page.getByRole('button', { name: 'Heartlands' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Heartlands' }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Focus board' }).click();
+  await expect(page.getByRole('heading', { name: 'Your dice' })).toBeHidden();
+  await expect(page.getByTestId('pixi-board')).toBeVisible();
+  await page.getByRole('button', { name: 'Show command deck' }).click();
+  await expect(page.getByRole('heading', { name: 'Your dice' })).toBeVisible();
+});
+
 test('explains resources and clearly marks die placement routes', async ({
   page,
 }) => {

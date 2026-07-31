@@ -72,6 +72,7 @@ import cardMarketArt from '../../../assets/generated/ui/card-market-v1.webp';
 import forgeUpgradeArt from '../../../assets/generated/ui/forge-upgrade-v1.webp';
 import shatteredCrownQuestArt from '../../../assets/generated/ui/shattered-crown-quest-v1.webp';
 import tabletopFrameArt from '../../../assets/generated/ui/tabletop-frame-v1.webp';
+import atlasOrnamentArt from '../../../assets/generated/ui/atlas-ornament-v1.webp';
 import victoryScoringArt from '../../../assets/generated/ui/victory-scoring-v1.webp';
 
 const SAVE_KEY = 'shattered-crown.debug-match.v4';
@@ -156,6 +157,7 @@ function panelArtStyle(asset: string): CSSProperties {
 function tableArtStyle(): CSSProperties {
   return {
     '--tabletop-frame': `url(${tabletopFrameArt})`,
+    '--atlas-ornament': `url(${atlasOrnamentArt})`,
   } as CSSProperties;
 }
 
@@ -1346,6 +1348,7 @@ export function App() {
     () => localStorage.getItem(TUTORIAL_KEY) === 'true',
   );
   const [activePanel, setActivePanel] = useState<ActivePanelId>('cards');
+  const [tableFocus, setTableFocus] = useState(false);
   const reducedMotion = useInterfaceStore((state) => state.reducedMotion);
   const toggleReducedMotion = useInterfaceStore(
     (state) => state.toggleReducedMotion,
@@ -1761,7 +1764,7 @@ export function App() {
 
   return (
     <main
-      className={`game-shell ${reducedMotion ? 'reduced-motion' : ''}`}
+      className={`game-shell ${reducedMotion ? 'reduced-motion' : ''} ${tableFocus ? 'table-focus' : ''}`}
       style={tableArtStyle()}
     >
       <header className="game-header" data-tutorial="header">
@@ -1785,6 +1788,13 @@ export function App() {
           </button>
           <button type="button" onClick={toggleReducedMotion}>
             Motion {reducedMotion ? 'off' : 'on'}
+          </button>
+          <button
+            aria-pressed={tableFocus}
+            type="button"
+            onClick={() => setTableFocus((current) => !current)}
+          >
+            {tableFocus ? 'Show command deck' : 'Focus board'}
           </button>
           <button type="button" onClick={saveMatch}>
             Save

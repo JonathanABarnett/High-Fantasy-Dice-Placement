@@ -30,10 +30,24 @@ const SLOT_Y = 108;
 const SLOT_GAP = 48;
 const SLOT_CENTER_Y = SLOT_Y + SLOT_SIZE / 2;
 
+type AtlasView = 'overview' | 'north' | 'heart' | 'south';
+
 interface BoardPoint {
   readonly x: number;
   readonly y: number;
 }
+
+const ATLAS_VIEWS: readonly {
+  readonly id: AtlasView;
+  readonly label: string;
+  readonly center: BoardPoint;
+  readonly scale: number;
+}[] = [
+  { id: 'overview', label: 'Realm', center: { x: 600, y: 380 }, scale: 1 },
+  { id: 'north', label: 'Highlands', center: { x: 600, y: 190 }, scale: 1.3 },
+  { id: 'heart', label: 'Heartlands', center: { x: 600, y: 390 }, scale: 1.34 },
+  { id: 'south', label: 'Frontier', center: { x: 600, y: 585 }, scale: 1.3 },
+];
 
 const LOCATION_POINTS: readonly BoardPoint[] = [
   { x: 56, y: 70 },
@@ -221,6 +235,16 @@ function drawBackdrop(stage: Container, texture: Texture): void {
   );
 }
 
+function atlasTransform(viewId: AtlasView) {
+  const view =
+    ATLAS_VIEWS.find((item) => item.id === viewId) ?? ATLAS_VIEWS[0]!;
+  return {
+    scale: view.scale,
+    x: BOARD_WIDTH / 2 - view.center.x * view.scale,
+    y: BOARD_HEIGHT / 2 - view.center.y * view.scale,
+  };
+}
+
 export function BoardRenderer(props: BoardRendererProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<Application | null>(null);
@@ -230,6 +254,7 @@ export function BoardRenderer(props: BoardRendererProps) {
   const pinRef = useRef(props.onPinLocation);
   const placeRef = useRef(props.onPlaceAtLocation);
   const [ready, setReady] = useState(false);
+  const [atlasView, setAtlasView] = useState<AtlasView>('overview');
   hoverRef.current = props.onHoverLocation;
   pinRef.current = props.onPinLocation;
   placeRef.current = props.onPlaceAtLocation;
@@ -283,7 +308,37 @@ export function BoardRenderer(props: BoardRendererProps) {
     if (pulseRef.current) app.ticker.remove(pulseRef.current);
     for (const child of app.stage.removeChildren())
       child.destroy({ children: true });
-    drawBackdrop(app.stage, mapTexture);
+    const world = new Container();
+    const camera = atlasTransform(atlasView);
+    world.scale.set(camera.scale);
+    world.position.set(camera.x, camera.y);
+    app.stage.addChild(world);
+    drawBackdrop(world, mapTexture);
+    // Small moving lights keep the realm feeling inhabited without changing
+    // hit areas or making the board itself jump under the cursor.
+    const motePoints: readonly (readonly [number, number, number])[] = [
+      [178, 160, 0x75c6ff],
+      [420, 118, 0xa86dff],
+      [704, 218, 0xf1c66f],
+      [1010, 172, 0xffd36d],
+      [286, 410, 0xff9a5c],
+      [620, 390, 0xf6d679],
+      [908, 442, 0x72d6c5],
+      [390, 646, 0x86d496],
+      [776, 616, 0x7cb7ff],
+    ];
+    const motes = props.reducedMotion
+      ? []
+      : motePoints.map(([x, y, color], index) => {
+          const mote = new Graphics()
+            .circle(0, 0, 7 + (index % 3))
+            .fill({ color, alpha: 0.12 })
+            .circle(0, 0, 2.2)
+            .fill({ color, alpha: 0.72 });
+          mote.position.set(x, y);
+          world.addChild(mote);
+          return { mote, x, y, phase: index * 0.72 };
+        });
 
     const legalLocationIds = new Set(
       props.legalActions
@@ -364,14 +419,12 @@ export function BoardRenderer(props: BoardRendererProps) {
       card.on('pointerover', () => {
         hoverRef.current(location.id);
         if (!props.reducedMotion && isActive) {
-          card.scale.set(1.018);
-          card.position.set(point.x - 2, point.y - 3);
+          aura.alpha = Math.min(0.5, aura.alpha + 0.13);
         }
       });
       card.on('pointerout', () => {
         hoverRef.current(null);
-        card.scale.set(1);
-        card.position.set(point.x, point.y);
+        aura.alpha = !isActive ? 0.03 : legal ? 0.22 : pinned ? 0.16 : 0.1;
       });
 
       const aura = new Graphics()
@@ -797,13 +850,18 @@ export function BoardRenderer(props: BoardRendererProps) {
       });
       occupancy.position.set(174, 132);
       card.addChild(occupancy);
-      app.stage.addChild(card);
+      world.addChild(card);
     });
 
     const pulse = () => {
       if (props.reducedMotion) return;
-      const alpha = 0.72 + Math.sin(performance.now() / 260) * 0.25;
+      const now = performance.now();
+      const alpha = 0.72 + Math.sin(now / 260) * 0.25;
       for (const target of pulseTargets) target.alpha = alpha;
+      for (const { mote, x, y, phase } of motes) {
+        mote.alpha = 0.54 + Math.sin(now / 720 + phase) * 0.28;
+        mote.position.set(x, y + Math.sin(now / 860 + phase) * 5);
+      }
     };
     pulseRef.current = pulse;
     app.ticker.add(pulse);
@@ -818,6 +876,7 @@ export function BoardRenderer(props: BoardRendererProps) {
     props.recommendedAction,
     props.reducedMotion,
     props.selectedDieId,
+    atlasView,
     ready,
   ]);
 
@@ -829,8 +888,15 @@ export function BoardRenderer(props: BoardRendererProps) {
     const canvas = appRef.current?.canvas;
     if (!dieId || !canvas) return;
     const bounds = canvas.getBoundingClientRect();
-    const x = ((event.clientX - bounds.left) / bounds.width) * BOARD_WIDTH;
-    const y = ((event.clientY - bounds.top) / bounds.height) * BOARD_HEIGHT;
+    const camera = atlasTransform(atlasView);
+    const x =
+      (((event.clientX - bounds.left) / bounds.width) * BOARD_WIDTH -
+        camera.x) /
+      camera.scale;
+    const y =
+      (((event.clientY - bounds.top) / bounds.height) * BOARD_HEIGHT -
+        camera.y) /
+      camera.scale;
     const index = LOCATION_POINTS.findIndex(
       (point) =>
         x >= point.x &&
@@ -913,43 +979,58 @@ export function BoardRenderer(props: BoardRendererProps) {
           style={tutorialLandmarkStyle(raidPoint)}
         />
       )}
-      {props.game.locations.map((location, index) => {
-        const point = LOCATION_POINTS[index];
-        if (!point) return null;
-        const canPlace =
-          props.selectedDieId !== null &&
-          legalLocationsForSelected.has(location.id);
-        return (
-          <button
-            aria-label={
-              props.selectedDieId
-                ? `${canPlace ? 'Place at' : 'Inspect'} ${location.name}`
-                : `Inspect ${location.name}`
-            }
-            className="location-inspect-hotspot"
-            data-testid={`location-hotspot-${location.id}`}
-            key={location.id}
-            onClick={() => {
-              if (props.selectedDieId && canPlace) {
-                placeRef.current(location.id, props.selectedDieId);
-                return;
+      {atlasView === 'overview' &&
+        props.game.locations.map((location, index) => {
+          const point = LOCATION_POINTS[index];
+          if (!point) return null;
+          const canPlace =
+            props.selectedDieId !== null &&
+            legalLocationsForSelected.has(location.id);
+          return (
+            <button
+              aria-label={
+                props.selectedDieId
+                  ? `${canPlace ? 'Place at' : 'Inspect'} ${location.name}`
+                  : `Inspect ${location.name}`
               }
-              pinRef.current(location.id);
-            }}
-            onBlur={() => hoverRef.current(null)}
-            onFocus={() => hoverRef.current(location.id)}
-            onMouseEnter={() => hoverRef.current(location.id)}
-            onMouseLeave={() => hoverRef.current(null)}
-            style={tutorialHotspotStyle(point)}
-            title={
-              props.selectedDieId
-                ? `${canPlace ? 'Place at' : 'Inspect'} ${location.name}`
-                : `Inspect ${location.name}`
-            }
+              className="location-inspect-hotspot"
+              data-testid={`location-hotspot-${location.id}`}
+              key={location.id}
+              onClick={() => {
+                if (props.selectedDieId && canPlace) {
+                  placeRef.current(location.id, props.selectedDieId);
+                  return;
+                }
+                pinRef.current(location.id);
+              }}
+              onBlur={() => hoverRef.current(null)}
+              onFocus={() => hoverRef.current(location.id)}
+              onMouseEnter={() => hoverRef.current(location.id)}
+              onMouseLeave={() => hoverRef.current(null)}
+              style={tutorialHotspotStyle(point)}
+              title={
+                props.selectedDieId
+                  ? `${canPlace ? 'Place at' : 'Inspect'} ${location.name}`
+                  : `Inspect ${location.name}`
+              }
+              type="button"
+            />
+          );
+        })}
+      <nav className="atlas-nav" aria-label="Realm camera">
+        <span>Atlas</span>
+        {ATLAS_VIEWS.map((view) => (
+          <button
+            aria-pressed={atlasView === view.id}
+            className={atlasView === view.id ? 'is-active' : ''}
+            key={view.id}
+            onClick={() => setAtlasView(view.id)}
             type="button"
-          />
-        );
-      })}
+          >
+            {view.label}
+          </button>
+        ))}
+      </nav>
       <div className="placement-guide" aria-live="polite">
         {selectedDie ? (
           <>

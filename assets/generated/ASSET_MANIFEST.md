@@ -77,6 +77,9 @@ as subtle right-side background art behind code-rendered text and controls.
   blackened wood, aged brass/gold trim, leather texture, calm central area, and
   subtle blue arcane accents. Used behind the main game shell to push the whole
   screen toward a premium tabletop-board presentation.
+- `ui/atlas-ornament-v1.webp`: wide low-contrast antique-gold compass rose,
+  cartographer filigree, constellation lines, and restrained arcane glints for
+  the interactive realm board overlay.
 
 ## Shared generation constraints
 
