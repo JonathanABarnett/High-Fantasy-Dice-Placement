@@ -21,6 +21,16 @@ test('starts a deterministic human-versus-CPU match', async ({ page }) => {
     'true',
   );
   await expect(page.getByRole('heading', { name: 'Your dice' })).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'Royal card market' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'Your card hand' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Sound on' }).click();
+  await expect(page.getByRole('button', { name: 'Sound off' })).toBeVisible();
+  await page.getByRole('button', { name: 'Sound off' }).click();
+  await expect(page.getByRole('button', { name: 'Sound on' })).toBeVisible();
   await expect(page.locator('.placement-guide')).toContainText(
     '6 active regions · 8 contested slots',
   );
@@ -30,6 +40,20 @@ test('starts a deterministic human-versus-CPU match', async ({ page }) => {
   ).toContainText('8/8 slots left');
   await page.getByRole('button', { name: 'Log' }).click();
   await expect(page.locator('.log-panel')).toContainText('entries');
+});
+
+test('keeps the realm full-width at the compact table breakpoint', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 800, height: 900 });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Start match' }).click();
+
+  const boardBox = await page.getByTestId('pixi-board').boundingBox();
+  expect(boardBox?.width ?? 0).toBeGreaterThan(700);
+  await expect(
+    page.getByRole('region', { name: 'Your card hand' }),
+  ).toBeVisible();
 });
 
 test('keeps the realm playable while using the atlas and board-focus mode', async ({

@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -76,9 +77,14 @@ import tabletopFrameArt from '../../../assets/generated/ui/tabletop-frame-v1.web
 import atlasOrnamentArt from '../../../assets/generated/ui/atlas-ornament-v1.webp';
 import diceTrayArt from '../../../assets/generated/ui/dice-tray-v1.webp';
 import victoryScoringArt from '../../../assets/generated/ui/victory-scoring-v1.webp';
+import arcaneCardFaceV2 from '../../../assets/generated/rebuild-v2/arcane-card-face-v2.webp';
+import fantasyDiceAtlasV1 from '../../../assets/generated/rebuild-v2/fantasy-dice-atlas-v1.webp';
+import playerTableauV2 from '../../../assets/generated/rebuild-v2/player-tableau-v2.webp';
+import tableSurfaceV2 from '../../../assets/generated/rebuild-v2/table-surface-v2.webp';
 
 const SAVE_KEY = 'shattered-crown.debug-match.v4';
 const TUTORIAL_KEY = 'shattered-crown.tutorial-complete.v1';
+const SOUND_KEY = 'shattered-crown.sound-enabled.v1';
 const SAVE_ENVELOPE_VERSION = 1;
 const FACTION_PORTRAITS: Readonly<Record<string, string>> = {
   'arcanum-conclave': arcanumPortrait,
@@ -160,6 +166,9 @@ function tableArtStyle(): CSSProperties {
   return {
     '--tabletop-frame': `url(${tabletopFrameArt})`,
     '--atlas-ornament': `url(${atlasOrnamentArt})`,
+    '--rebuild-table': `url(${tableSurfaceV2})`,
+    '--player-tableau': `url(${playerTableauV2})`,
+    '--card-face-v2': `url(${arcaneCardFaceV2})`,
   } as CSSProperties;
 }
 
@@ -927,6 +936,161 @@ function CountUp({
 const ROLL_DURATION_MS = 620;
 const ROLL_TICK_MS = 60;
 
+type GameSoundCue =
+  | 'acquire'
+  | 'bump'
+  | 'card'
+  | 'combat'
+  | 'dice'
+  | 'error'
+  | 'forge'
+  | 'panel'
+  | 'pass'
+  | 'place'
+  | 'quest'
+  | 'resource'
+  | 'select'
+  | 'turn'
+  | 'victory';
+
+function cueForEvents(events: readonly GameEvent[]): GameSoundCue {
+  if (events.some((event) => event.type === 'match-completed'))
+    return 'victory';
+  if (events.some((event) => event.type === 'objective-claimed'))
+    return 'quest';
+  if (events.some((event) => event.type === 'monster-slain')) return 'combat';
+  if (events.some((event) => event.type === 'raid-damaged')) return 'combat';
+  if (events.some((event) => event.type === 'die-bumped')) return 'bump';
+  if (events.some((event) => event.type === 'die-upgraded')) return 'forge';
+  if (events.some((event) => event.type === 'card-played')) return 'card';
+  if (events.some((event) => event.type === 'card-acquired')) return 'acquire';
+  if (events.some((event) => event.type === 'die-placed')) return 'place';
+  if (events.some((event) => event.type === 'player-passed')) return 'pass';
+  if (events.some((event) => event.type === 'round-started')) return 'turn';
+  return 'resource';
+}
+
+/**
+ * A tiny procedural score for moment-to-moment feedback. It deliberately uses
+ * Web Audio rather than bundled files, so the game gains tactile sound now and
+ * every cue can later be swapped for a licensed sample without changing the
+ * engine or action flow.
+ */
+function useGameAudio(enabled: boolean) {
+  const contextRef = useRef<AudioContext | null>(null);
+
+  useEffect(
+    () => () => {
+      const context = contextRef.current;
+      contextRef.current = null;
+      if (context && context.state !== 'closed') void context.close();
+    },
+    [],
+  );
+
+  return useCallback(
+    (cue: GameSoundCue, force = false) => {
+      if (!enabled && !force) return;
+      const AudioContextConstructor =
+        window.AudioContext ??
+        (
+          window as typeof window & {
+            readonly webkitAudioContext?: typeof AudioContext;
+          }
+        ).webkitAudioContext;
+      if (!AudioContextConstructor) return;
+      const context =
+        contextRef.current ??
+        (contextRef.current = new AudioContextConstructor());
+
+      const score = () => {
+        const now = context.currentTime;
+        const tone = (
+          frequency: number,
+          duration: number,
+          delay = 0,
+          type: OscillatorType = 'sine',
+          volume = 0.028,
+          endFrequency?: number,
+        ) => {
+          const oscillator = context.createOscillator();
+          const gain = context.createGain();
+          const start = now + delay;
+          const end = start + duration;
+          oscillator.type = type;
+          oscillator.frequency.setValueAtTime(frequency, start);
+          if (endFrequency) {
+            oscillator.frequency.exponentialRampToValueAtTime(
+              Math.max(20, endFrequency),
+              end,
+            );
+          }
+          gain.gain.setValueAtTime(0.0001, start);
+          gain.gain.exponentialRampToValueAtTime(volume, start + 0.012);
+          gain.gain.exponentialRampToValueAtTime(0.0001, end);
+          oscillator.connect(gain).connect(context.destination);
+          oscillator.start(start);
+          oscillator.stop(end + 0.02);
+        };
+
+        if (cue === 'dice') {
+          [240, 310, 270, 360, 420].forEach((frequency, index) =>
+            tone(frequency, 0.055, index * 0.055, 'square', 0.014),
+          );
+          tone(120, 0.19, 0.28, 'sine', 0.035, 70);
+        } else if (cue === 'place') {
+          tone(105, 0.2, 0, 'sine', 0.042, 48);
+          tone(460, 0.14, 0.055, 'triangle', 0.018, 620);
+        } else if (cue === 'select') {
+          tone(520, 0.075, 0, 'triangle', 0.018, 680);
+        } else if (cue === 'panel') {
+          tone(330, 0.08, 0, 'triangle', 0.012, 410);
+        } else if (cue === 'card') {
+          [440, 660, 880].forEach((frequency, index) =>
+            tone(frequency, 0.18, index * 0.045, 'triangle', 0.022),
+          );
+        } else if (cue === 'acquire' || cue === 'resource') {
+          tone(760, 0.11, 0, 'sine', 0.024);
+          tone(cue === 'acquire' ? 1180 : 960, 0.18, 0.07, 'sine', 0.025);
+        } else if (cue === 'combat') {
+          tone(125, 0.28, 0, 'sawtooth', 0.044, 42);
+          tone(58, 0.32, 0.025, 'square', 0.026, 34);
+        } else if (cue === 'bump') {
+          tone(170, 0.16, 0, 'sawtooth', 0.036, 68);
+          tone(540, 0.09, 0.1, 'square', 0.017, 340);
+        } else if (cue === 'forge') {
+          tone(170, 0.1, 0, 'square', 0.025, 120);
+          tone(240, 0.11, 0.105, 'square', 0.025, 160);
+          tone(740, 0.28, 0.2, 'triangle', 0.025);
+        } else if (cue === 'quest' || cue === 'victory') {
+          const notes =
+            cue === 'victory' ? [392, 523, 659, 784] : [392, 523, 659];
+          notes.forEach((frequency, index) =>
+            tone(frequency, 0.42, index * 0.09, 'triangle', 0.026),
+          );
+        } else if (cue === 'turn') {
+          tone(520, 0.2, 0, 'sine', 0.018);
+          tone(780, 0.28, 0.09, 'sine', 0.022);
+        } else if (cue === 'pass') {
+          tone(300, 0.2, 0, 'triangle', 0.02, 180);
+        } else {
+          tone(145, 0.2, 0, 'square', 0.022, 92);
+        }
+      };
+
+      if (context.state === 'suspended') {
+        void context
+          .resume()
+          .then(score)
+          .catch(() => undefined);
+      } else {
+        score();
+      }
+    },
+    [enabled],
+  );
+}
+
 /**
  * Cosmetic tumbling for the dice tray. This is a dice game in which the player
  * had never actually seen a die roll — values simply changed between rounds.
@@ -1393,6 +1557,11 @@ export function App() {
   // so a new turn reads as a board game, not as a dashboard of competing panes.
   const [activePanel, setActivePanel] = useState<ActivePanelId>(null);
   const [tableFocus, setTableFocus] = useState(false);
+  const [marketExpanded, setMarketExpanded] = useState(false);
+  const [utilitiesOpen, setUtilitiesOpen] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(
+    () => localStorage.getItem(SOUND_KEY) !== 'false',
+  );
   const reducedMotion = useInterfaceStore((state) => state.reducedMotion);
   const toggleReducedMotion = useInterfaceStore(
     (state) => state.toggleReducedMotion,
@@ -1408,6 +1577,7 @@ export function App() {
     [game],
   );
   const diceRoll = useDiceRoll(human?.dice, reducedMotion);
+  const playSound = useGameAudio(soundEnabled);
   /** Who is ahead on the real scoring rules, and by how much. */
   const leader = useMemo(() => {
     if (!game) return { id: null as PlayerId | null, margin: 0 };
@@ -1430,6 +1600,16 @@ export function App() {
   );
   const selectedDie =
     human?.dice.find((die) => die.id === selectedDieId) ?? null;
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setSelectedDieId(null);
+      setPinnedLocationId(null);
+      setHoveredLocationId(null);
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, []);
   const selectedDieRoutes = useMemo(() => {
     if (!game || !selectedDieId) return [];
     return legalActions.filter(
@@ -1478,10 +1658,13 @@ export function App() {
     setPinnedLocationId(locationId);
   };
   const selectDieForPlanning = (dieId: DieId) => {
+    playSound('select');
     setSelectedDieId(dieId);
   };
-  const showPanel = (panel: CollapsiblePanelId) =>
+  const showPanel = (panel: CollapsiblePanelId) => {
+    playSound('panel');
     setActivePanel((current) => (current === panel ? null : panel));
+  };
   const pressure = useMemo(() => {
     if (!game || !human) return null;
     const openLocations = game.locations.filter(
@@ -1537,19 +1720,23 @@ export function App() {
     ),
   );
 
-  const appendEvents = (events: readonly GameEvent[], nextState: GameState) => {
-    setLog((current) =>
-      [
-        ...events.map((event) => describeEvent(event, nextState)),
-        ...current,
-      ].slice(0, 80),
-    );
-    const headline = events
-      .map((event) => calloutFor(event, nextState))
-      .filter((item): item is Callout => item !== null)
-      .sort((left, right) => right.weight - left.weight)[0];
-    if (headline) setCallout({ ...headline, key: nextState.eventSequence });
-  };
+  const appendEvents = useCallback(
+    (events: readonly GameEvent[], nextState: GameState) => {
+      playSound(cueForEvents(events));
+      setLog((current) =>
+        [
+          ...events.map((event) => describeEvent(event, nextState)),
+          ...current,
+        ].slice(0, 80),
+      );
+      const headline = events
+        .map((event) => calloutFor(event, nextState))
+        .filter((item): item is Callout => item !== null)
+        .sort((left, right) => right.weight - left.weight)[0];
+      if (headline) setCallout({ ...headline, key: nextState.eventSequence });
+    },
+    [playSound],
+  );
 
   const launchActionFeedback = useCallback(
     (before: GameState, events: readonly GameEvent[]) => {
@@ -1613,6 +1800,7 @@ export function App() {
       content: { factions, locations, cards, upgrades, objectives },
     });
     setGame(created.state);
+    playSound('dice');
     setSelectedDieId(null);
     setUpgradeDieId(created.state.players[0]?.dice[0]?.id ?? null);
     setError(null);
@@ -1622,12 +1810,16 @@ export function App() {
         .map((event) => describeEvent(event, created.state))
         .reverse(),
     );
+    requestAnimationFrame(() =>
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' }),
+    );
   };
 
   const submitHumanAction = (action: GameAction) => {
     if (!game) return;
     const validation = validateAction(game, action);
     if (!validation.legal) {
+      playSound('error');
       setError(validation.message);
       return;
     }
@@ -1645,11 +1837,13 @@ export function App() {
   ) => {
     if (!game || !human) return;
     if (activePlayer?.controller !== 'human') {
+      playSound('error');
       setError('The CPU is considering its move.');
       return;
     }
     const dieId = requestedDieId ?? selectedDieId;
     if (!dieId) {
+      playSound('error');
       setError('Select or drag a ready die before choosing a location.');
       return;
     }
@@ -1694,6 +1888,7 @@ export function App() {
         ? rejection.message
         : 'No legal slot is available at that location.',
     );
+    playSound('error');
   };
 
   useEffect(() => {
@@ -1709,7 +1904,13 @@ export function App() {
       appendEvents(result.events, result.state);
     }, 220);
     return () => window.clearTimeout(timer);
-  }, [activePlayer?.controller, difficulty, game, launchActionFeedback]);
+  }, [
+    activePlayer?.controller,
+    appendEvents,
+    difficulty,
+    game,
+    launchActionFeedback,
+  ]);
 
   const saveMatch = () => {
     if (!game) return;
@@ -1741,6 +1942,9 @@ export function App() {
       );
       setLog(['Saved match restored.']);
       setError(null);
+      requestAnimationFrame(() =>
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' }),
+      );
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -1848,15 +2052,27 @@ export function App() {
 
   return (
     <main
-      className={`game-shell ${reducedMotion ? 'reduced-motion' : ''} ${tableFocus ? 'table-focus' : ''}`}
+      className={`game-shell ${reducedMotion ? 'reduced-motion' : ''} ${tableFocus ? 'table-focus' : ''} ${callout ? `event-active event-${callout.tone}` : ''}`}
       style={tableArtStyle()}
     >
+      {callout && (
+        <div
+          aria-hidden="true"
+          className={`event-flare event-flare-${callout.tone}`}
+          key={callout.key}
+        />
+      )}
       <header className="game-header" data-tutorial="header">
         <div>
           <p className="eyebrow">Six rounds to claim the crown</p>
           <h1>Shattered Crown</h1>
         </div>
         <div className="round-block">
+          <span
+            className={`phase-badge phase-${game.phase === 'complete' ? 'complete' : 'action'}`}
+          >
+            {game.phase === 'complete' ? 'Final scoring' : 'Action phase'}
+          </span>
           <strong>
             Round {game.round.number} / {game.round.maximum}
           </strong>
@@ -1865,26 +2081,80 @@ export function App() {
               ? 'Final scoring'
               : `${activePlayer?.name ?? '—'} to act`}
           </span>
+          <span
+            className="round-pips"
+            aria-label={`Round ${game.round.number}`}
+          >
+            {Array.from({ length: game.round.maximum }, (_, index) => {
+              const round = index + 1;
+              return (
+                <i
+                  className={
+                    round < game.round.number
+                      ? 'is-complete'
+                      : round === game.round.number
+                        ? 'is-current'
+                        : ''
+                  }
+                  key={round}
+                />
+              );
+            })}
+          </span>
         </div>
-        <div className="button-row compact">
+        <div className={`button-row compact ${utilitiesOpen ? 'is-open' : ''}`}>
           <button type="button" onClick={() => setTutorialOpen(true)}>
             How to play
           </button>
-          <button type="button" onClick={toggleReducedMotion}>
+          <button
+            className="utility-secondary"
+            type="button"
+            onClick={toggleReducedMotion}
+          >
             Motion {reducedMotion ? 'off' : 'on'}
           </button>
           <button
+            className="utility-secondary"
+            aria-pressed={soundEnabled}
+            type="button"
+            onClick={() => {
+              const next = !soundEnabled;
+              setSoundEnabled(next);
+              localStorage.setItem(SOUND_KEY, String(next));
+              if (next) playSound('turn', true);
+            }}
+          >
+            Sound {soundEnabled ? 'on' : 'off'}
+          </button>
+          <button
+            className="utility-secondary"
             aria-pressed={tableFocus}
             type="button"
             onClick={() => setTableFocus((current) => !current)}
           >
             {tableFocus ? 'Show command deck' : 'Focus board'}
           </button>
-          <button type="button" onClick={saveMatch}>
+          <button
+            className="utility-secondary"
+            type="button"
+            onClick={saveMatch}
+          >
             Save
           </button>
-          <button type="button" onClick={() => setGame(null)}>
+          <button
+            className="utility-secondary"
+            type="button"
+            onClick={() => setGame(null)}
+          >
             Restart
+          </button>
+          <button
+            aria-expanded={utilitiesOpen}
+            className="utility-menu"
+            type="button"
+            onClick={() => setUtilitiesOpen((current) => !current)}
+          >
+            {utilitiesOpen ? 'Less' : 'More'}
           </button>
         </div>
       </header>
@@ -1900,6 +2170,12 @@ export function App() {
             key={player.id}
             data-player-id={player.id}
           >
+            {player.id === game.turn.activePlayerId &&
+              game.phase === 'action' && (
+                <span className="active-turn-badge">
+                  <i aria-hidden="true" /> Active
+                </span>
+              )}
             <img
               alt=""
               className="faction-portrait"
@@ -1939,7 +2215,7 @@ export function App() {
               </strong>
               <span>
                 {leader.margin === 0
-                  ? 'level'
+                  ? 'tied'
                   : leader.id === player.id
                     ? `ahead by ${leader.margin}`
                     : `behind by ${leader.margin}`}
@@ -1973,6 +2249,71 @@ export function App() {
           );
         })}
       </section>
+
+      {game.phase !== 'complete' && (
+        <section
+          className={`market-ribbon ${marketExpanded ? 'is-expanded' : 'is-collapsed'}`}
+          aria-label="Royal card market"
+        >
+          <div className="market-ribbon-heading">
+            <span className="eyebrow">Royal market</span>
+            <strong>Available schemes</strong>
+            <small>{game.cardDeck.length} cards remain</small>
+            <button
+              aria-expanded={marketExpanded}
+              className="market-ribbon-toggle"
+              type="button"
+              onClick={() => setMarketExpanded((current) => !current)}
+            >
+              {marketExpanded ? 'Hide market' : 'Show market'}
+            </button>
+          </div>
+          <div className="market-ribbon-cards">
+            {game.cardMarket.map((cardId, index) => {
+              const card = game.cards.find((item) => item.id === cardId);
+              if (!card || !human) return null;
+              const action: GameAction = {
+                type: 'acquire-card',
+                playerId: human.id,
+                cardId,
+              };
+              const legal = validateAction(game, action).legal;
+              return (
+                <article
+                  className={`market-ribbon-card market-ribbon-${card.category}`}
+                  key={`${cardId}-${index}`}
+                  style={cardArtStyle(card.category)}
+                >
+                  <div className="market-ribbon-art" aria-hidden="true" />
+                  <div className="market-ribbon-copy">
+                    <span>
+                      <CategoryToken category={card.category} />
+                      <small>Scheme {index + 1}</small>
+                    </span>
+                    <strong>{card.name}</strong>
+                    <p>{card.rulesText}</p>
+                  </div>
+                  <button
+                    disabled={!legal || activePlayer?.controller !== 'human'}
+                    onClick={() => submitHumanAction(action)}
+                    type="button"
+                  >
+                    <span>Acquire</span>
+                    <ResourceList values={card.cost} />
+                  </button>
+                </article>
+              );
+            })}
+          </div>
+          <button
+            className="market-ribbon-more"
+            onClick={() => showPanel('cards')}
+            type="button"
+          >
+            Hand &amp; market
+          </button>
+        </section>
+      )}
 
       {game.phase === 'complete' ? (
         <section
@@ -2038,6 +2379,67 @@ export function App() {
                 selectedDieId={selectedDieId}
               />
             )}
+            {human && human.hand.length > 0 && (
+              <section className="hand-dock" aria-label="Your card hand">
+                <div className="hand-dock-heading">
+                  <span className="eyebrow">Your hand</span>
+                  <strong>{human.hand.length}</strong>
+                </div>
+                <div className="hand-dock-cards">
+                  {human.hand.map((cardId, index) => {
+                    const card = game.cards.find((item) => item.id === cardId);
+                    if (!card) return null;
+                    const action: GameAction = {
+                      type: 'play-card',
+                      playerId: human.id,
+                      cardId,
+                      ...(card.target === 'ready-die' && selectedDieId
+                        ? { targetDieId: selectedDieId }
+                        : {}),
+                    };
+                    const legal = validateAction(game, action).legal;
+                    return (
+                      <article
+                        className={`hand-dock-card hand-dock-${card.category}`}
+                        key={`${cardId}-${index}`}
+                        style={cardArtStyle(card.category)}
+                      >
+                        <div className="hand-dock-art" aria-hidden="true" />
+                        <div>
+                          <span>
+                            <CategoryToken category={card.category} />
+                            <ResourceList values={card.cost} />
+                          </span>
+                          <strong>{card.name}</strong>
+                          <p>{card.rulesText}</p>
+                        </div>
+                        <button
+                          aria-label={`Play ${card.name}`}
+                          disabled={
+                            !legal || activePlayer?.controller !== 'human'
+                          }
+                          onClick={() => submitHumanAction(action)}
+                          type="button"
+                        >
+                          {card.target === 'ready-die'
+                            ? selectedDieId
+                              ? 'Cast on die'
+                              : 'Choose a die'
+                            : 'Play'}
+                        </button>
+                      </article>
+                    );
+                  })}
+                </div>
+                <button
+                  className="hand-dock-expand"
+                  onClick={() => showPanel('cards')}
+                  type="button"
+                >
+                  View all
+                </button>
+              </section>
+            )}
             <LocationDecisionDock
               game={game}
               human={human}
@@ -2061,6 +2463,70 @@ export function App() {
               </span>
             </div>
           </section>
+
+          {human && (
+            <aside className="kingdom-tableau" aria-label="Your realm tableau">
+              <header>
+                <span className="eyebrow">Your domain</span>
+                <strong>
+                  {
+                    factions.find((faction) => faction.id === human.factionId)
+                      ?.name
+                  }
+                </strong>
+              </header>
+              <div className="kingdom-stat-grid">
+                <article>
+                  <span>Arcane power</span>
+                  <strong>{human.resources.mana}</strong>
+                </article>
+                <article>
+                  <span>Great library</span>
+                  <strong>{human.resources.knowledge}</strong>
+                </article>
+                <article>
+                  <span>Forged faces</span>
+                  <strong>
+                    {human.dice.reduce(
+                      (total, die) => total + die.enhancements.length,
+                      0,
+                    )}
+                  </strong>
+                </article>
+                <article>
+                  <span>Court favor</span>
+                  <strong>{human.resources.influence}</strong>
+                </article>
+                <article>
+                  <span>Royal treasury</span>
+                  <strong>{human.resources.gold}</strong>
+                </article>
+                <article>
+                  <span>Crown standing</span>
+                  <strong>{scoreTotal(game, human.id)}</strong>
+                </article>
+              </div>
+              <footer>
+                <span>Relics &amp; claims</span>
+                <div className="tableau-relics">
+                  {[0, 1, 2, 3].map((index) => {
+                    const claimed = game.objectives.filter(
+                      (objective) => objective.claimedBy === human.id,
+                    )[index];
+                    return (
+                      <i
+                        className={claimed ? 'is-filled' : ''}
+                        key={index}
+                        title={claimed?.name ?? 'Empty relic socket'}
+                      >
+                        {claimed ? '◆' : ''}
+                      </i>
+                    );
+                  })}
+                </div>
+              </footer>
+            </aside>
+          )}
 
           <aside className="sidebar" data-tutorial="war-table">
             <section className="dice-panel" style={diceTrayStyle()}>
@@ -2102,6 +2568,10 @@ export function App() {
                     .join(' ');
                   return (
                     <button
+                      aria-label={`${affinity.label} die, value ${value}${
+                        selectedDieId === die.id ? ', selected' : ''
+                      }`}
+                      aria-pressed={selectedDieId === die.id}
                       className={classes}
                       data-die-id={die.id}
                       data-tooltip={`${affinity.label}: ${affinity.description}${symbolSummary}${forgedSummary}`}
@@ -2124,6 +2594,12 @@ export function App() {
                       onClick={() => selectDieForPlanning(die.id)}
                       type="button"
                     >
+                      <span
+                        aria-hidden="true"
+                        className={`die-art die-art-${die.affinity}`}
+                      >
+                        <img alt="" src={fantasyDiceAtlasV1} />
+                      </span>
                       <span aria-hidden="true" className="die-glyph">
                         <GameIcon name={affinity.icon} />
                       </span>
@@ -2155,7 +2631,7 @@ export function App() {
                 })}
               </div>
               {human && <MomentumMeter player={human} />}
-              {human && selectedDie && activePlayer?.controller === 'human' && (
+              {human && activePlayer?.controller === 'human' && (
                 <>
                   <MoveAdvisor
                     previews={movePreviews}
@@ -2168,7 +2644,13 @@ export function App() {
                   />
                 </>
               )}
-              <section className="turn-summary" aria-label="Current turn plan">
+              <section
+                className={`turn-summary ${selectedDie ? 'is-armed' : 'is-ready'}`}
+                aria-label="Current turn plan"
+              >
+                <span className="turn-summary-kicker">
+                  {selectedDie ? 'Die armed' : 'Current action'}
+                </span>
                 <div>
                   <strong>
                     {selectedDie
@@ -2180,23 +2662,9 @@ export function App() {
                   <span>
                     {selectedDie
                       ? `${selectedDieRoutes.length} legal route${selectedDieRoutes.length === 1 ? '' : 's'} available`
-                      : inspectedLocation
-                        ? `Inspecting ${inspectedLocation.name}`
-                        : 'Select a die to light up playable spaces.'}
+                      : 'Select a die to light up playable spaces.'}
                   </span>
                 </div>
-                {inspectedLocation && (
-                  <div>
-                    <strong>{inspectedLocation.name}</strong>
-                    <span>
-                      Reward:{' '}
-                      <ResourceList
-                        includeVictoryPoints
-                        values={inspectedLocation.reward}
-                      />
-                    </span>
-                  </div>
-                )}
                 <div className="panel-shortcuts" aria-label="Open info panels">
                   {PANEL_SHORTCUTS.map((shortcut) => {
                     // A dot means there is an action waiting behind that tab,
@@ -2260,16 +2728,42 @@ export function App() {
                           candidate.dieId === selectedDieId &&
                           candidate.locationId === location.id,
                       );
+                      const placementAction =
+                        action &&
+                        (action.type === 'place-die' ||
+                          action.type === 'bump-die')
+                          ? action
+                          : null;
+                      const slotNumber = placementAction
+                        ? location.slots.findIndex(
+                            (slot) => slot.id === placementAction.slotId,
+                          ) + 1
+                        : null;
                       return (
                         <button
-                          disabled={!action}
+                          aria-label={
+                            placementAction
+                              ? `${
+                                  placementAction.type === 'bump-die'
+                                    ? 'Bump at'
+                                    : 'Place at'
+                                } ${location.name}, slot ${slotNumber}`
+                              : `${location.name}: no legal placement`
+                          }
+                          disabled={!placementAction}
                           key={location.id}
                           onClick={() =>
                             placeAtLocation(location.id, selectedDieId)
                           }
                           type="button"
                         >
-                          {location.name}
+                          {placementAction
+                            ? `${
+                                placementAction.type === 'bump-die'
+                                  ? 'Bump'
+                                  : 'Place'
+                              } · ${location.name}`
+                            : `${location.name} · unavailable`}
                         </button>
                       );
                     })}
