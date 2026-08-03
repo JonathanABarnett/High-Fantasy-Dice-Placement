@@ -20,19 +20,24 @@ test('starts a deterministic human-versus-CPU match', async ({ page }) => {
     'data-ready',
     'true',
   );
-  await expect(page.getByRole('heading', { name: 'Your dice' })).toBeVisible();
+  await expect(page.locator('.dice-panel')).toBeVisible();
   await expect(
     page.getByRole('region', { name: 'Royal card market' }),
-  ).toBeVisible();
+  ).toBeHidden();
   await expect(
     page.getByRole('region', { name: 'Your card hand' }),
   ).toBeVisible();
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByRole('button', { name: 'Sound on' }).click();
   await expect(page.getByRole('button', { name: 'Sound off' })).toBeVisible();
   await page.getByRole('button', { name: 'Sound off' }).click();
   await expect(page.getByRole('button', { name: 'Sound on' })).toBeVisible();
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.locator('.placement-guide')).toBeHidden();
+  await page.locator('.die:not([disabled])').first().click();
+  await expect(page.locator('.placement-guide')).toBeVisible();
   await expect(page.locator('.placement-guide')).toContainText(
-    '6 active regions · 8 contested slots',
+    /Value \d [A-Za-z]+ die selected/,
   );
   await page.getByRole('button', { name: 'Pressure' }).click();
   await expect(
@@ -56,7 +61,7 @@ test('keeps the realm full-width at the compact table breakpoint', async ({
   ).toBeVisible();
 });
 
-test('keeps the realm playable while using the atlas and board-focus mode', async ({
+test('keeps the realm playable while using the atlas and compact game menu', async ({
   page,
 }) => {
   await page.goto('/');
@@ -66,11 +71,12 @@ test('keeps the realm playable while using the atlas and board-focus mode', asyn
   await expect(
     page.getByRole('button', { name: 'Heartlands' }),
   ).toHaveAttribute('aria-pressed', 'true');
-  await page.getByRole('button', { name: 'Focus board' }).click();
-  await expect(page.getByRole('heading', { name: 'Your dice' })).toBeHidden();
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'How to play' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
   await expect(page.getByTestId('pixi-board')).toBeVisible();
-  await page.getByRole('button', { name: 'Show command deck' }).click();
-  await expect(page.getByRole('heading', { name: 'Your dice' })).toBeVisible();
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Menu' })).toBeVisible();
 });
 
 test('explains resources and clearly marks die placement routes', async ({
@@ -156,20 +162,21 @@ test('guides a new player through the complete visual tutorial', async ({
   await expect(page.getByTestId('tutorial-overlay')).toBeVisible();
 
   const remainingTitles = [
-    'Read the live standing',
-    'Read and select your dice',
-    'Use the command center',
-    'Place dice to gain rewards',
-    'Inspect rewards and restrictions',
-    'Open only the panels you need',
+    'Track score and resources',
+    'Start every turn in the tray',
+    'Lift a die to plan',
+    'Follow the legal glow',
+    'Pin a location for full details',
+    'Chain placements into momentum',
+    'Play directly from your hand',
+    'Open one system drawer at a time',
     'Hunt monsters for their spoils',
     'Wound the Elder Dragon together',
     'Bump rivals off contested slots',
-    'Play cards, buy engines',
     'Unlock upgrades at Forge Hall',
     'Claim the Crown Quests first',
     'Pass when your plans are complete',
-    'Follow the log and build your score',
+    'Use the menu, log, and final reckoning',
   ];
   for (const title of remainingTitles) {
     const next = tutorial.getByRole('button', { name: 'Next' });
@@ -190,6 +197,7 @@ test('guides a new player through the complete visual tutorial', async ({
 
   await tutorial.getByRole('button', { name: 'Begin playing' }).click();
   await expect(tutorial).not.toBeVisible();
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByRole('button', { name: 'How to play' }).click();
   await expect(tutorial).toBeVisible();
   await page.keyboard.press('Escape');
@@ -216,9 +224,12 @@ test('plays a faction card through the typed effect system', async ({
   await page.goto('/');
   await page.getByRole('button', { name: 'Start match' }).click();
   await page.locator('.panel-shortcut').filter({ hasText: 'Cards' }).click();
-  await expect(page.getByRole('heading', { name: 'Your hand' })).toBeVisible();
-  await expect(page.getByText('Revelation of Stars')).toBeVisible();
-  await page.getByRole('button', { name: 'Play card' }).click();
+  const cardsPanel = page.locator('.card-panel');
+  await expect(
+    cardsPanel.getByRole('heading', { name: 'Your hand' }),
+  ).toBeVisible();
+  await expect(cardsPanel.getByText('Revelation of Stars')).toBeVisible();
+  await cardsPanel.getByRole('button', { name: 'Play card' }).click();
   const log = await openMatchLog(page);
   await expect(
     log.getByText('Player played Revelation of Stars.'),
@@ -239,10 +250,9 @@ test('unlocks Forge Hall and permanently upgrades a die face', async ({
     await page.getByRole('button', { name: 'Start match' }).click();
     await page.locator('.die:not([disabled])').first().click();
     await page.getByText('Keyboard placement options').click();
-    const forgeRoute = page.getByRole('button', {
-      exact: true,
-      name: 'Forge Hall',
-    });
+    const forgeRoute = page
+      .locator('.accessible-actions button')
+      .filter({ hasText: 'Forge Hall' });
     if (await forgeRoute.isEnabled()) {
       await forgeRoute.click();
       foundForgeRoute = true;

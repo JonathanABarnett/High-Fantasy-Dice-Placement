@@ -7,6 +7,7 @@ test-results/
 .vite/
 *.tsbuildinfo
 debug.log
+vite.*.log
 .env
 .env.*
 !.env.example

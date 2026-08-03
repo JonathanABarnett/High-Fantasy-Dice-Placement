@@ -35,6 +35,7 @@ import {
   validateAction,
 } from '@shattered-crown/game-engine';
 import type {
+  CardId,
   CardCategory,
   DieFace,
   DieId,
@@ -83,7 +84,7 @@ import playerTableauV2 from '../../../assets/generated/rebuild-v2/player-tableau
 import tableSurfaceV2 from '../../../assets/generated/rebuild-v2/table-surface-v2.webp';
 
 const SAVE_KEY = 'shattered-crown.debug-match.v4';
-const TUTORIAL_KEY = 'shattered-crown.tutorial-complete.v1';
+const TUTORIAL_KEY = 'shattered-crown.tutorial-complete.v2';
 const SOUND_KEY = 'shattered-crown.sound-enabled.v1';
 const SAVE_ENVELOPE_VERSION = 1;
 const FACTION_PORTRAITS: Readonly<Record<string, string>> = {
@@ -844,6 +845,12 @@ function throwPiece(
   if (!source || !target) return;
   const from = source.getBoundingClientRect();
   const to = target.getBoundingClientRect();
+  const fromX = from.left + from.width / 2;
+  const fromY = from.top + from.height / 2;
+  const toX = to.left + to.width / 2;
+  const toY = to.top + to.height / 2;
+  const midX = fromX + (toX - fromX) * 0.52;
+  const midY = fromY + (toY - fromY) * 0.52 - 52;
   const node = document.createElement('div');
   node.className = className;
   node.setAttribute('aria-hidden', 'true');
@@ -852,11 +859,16 @@ function throwPiece(
   const animation = node.animate(
     [
       {
-        transform: `translate(${from.left + from.width / 2}px, ${from.top + from.height / 2}px) translate(-50%, -50%) scale(0.85) rotate(-12deg)`,
+        transform: `translate(${fromX}px, ${fromY}px) translate(-50%, -50%) scale(0.72) rotate(-18deg)`,
         opacity: 0.25,
       },
       {
-        transform: `translate(${to.left + to.width / 2}px, ${to.top + to.height / 2}px) translate(-50%, -50%) scale(1.2) rotate(12deg)`,
+        transform: `translate(${midX}px, ${midY}px) translate(-50%, -50%) scale(1.18) rotate(14deg)`,
+        opacity: 1,
+        offset: 0.52,
+      },
+      {
+        transform: `translate(${toX}px, ${toY}px) translate(-50%, -50%) scale(1.06) rotate(2deg)`,
         opacity: 0,
       },
     ],
@@ -896,6 +908,57 @@ function throwRewardToPlayer(
     `[data-player-id="${playerId}"] .resource-${resource}`,
     `+${amount} ${RESOURCE_FLIGHT_SYMBOLS[resource]}`,
     `reward-flight reward-${resource}`,
+  );
+}
+
+function pulseElement(selector: string, className: string, duration = 720) {
+  const target = document.querySelector<HTMLElement>(selector);
+  if (!target) return;
+  target.classList.remove(className);
+  void target.offsetWidth;
+  target.classList.add(className);
+  window.setTimeout(() => target.classList.remove(className), duration);
+}
+
+function burstAt(selector: string, glyph: string, className: string) {
+  const target = document.querySelector<HTMLElement>(selector);
+  if (!target) return;
+  const bounds = target.getBoundingClientRect();
+  const burst = document.createElement('div');
+  burst.className = `impact-burst ${className}`;
+  burst.setAttribute('aria-hidden', 'true');
+  burst.textContent = glyph;
+  burst.style.left = `${bounds.left + bounds.width / 2}px`;
+  burst.style.top = `${bounds.top + bounds.height / 2}px`;
+  document.body.appendChild(burst);
+  const animation = burst.animate(
+    [
+      {
+        transform: 'translate(-50%, -50%) scale(0.45) rotate(-12deg)',
+        opacity: 0,
+      },
+      {
+        transform: 'translate(-50%, -50%) scale(1.25) rotate(6deg)',
+        opacity: 1,
+        offset: 0.38,
+      },
+      {
+        transform: 'translate(-50%, -72%) scale(1.05) rotate(0deg)',
+        opacity: 0,
+      },
+    ],
+    { duration: 760, easing: 'cubic-bezier(0.2, 0.8, 0.25, 1)' },
+  );
+  animation.onfinish = () => burst.remove();
+  animation.oncancel = () => burst.remove();
+}
+
+function throwCardToPlayer(cardId: CardId, playerId: PlayerId) {
+  throwPiece(
+    `[data-card-id="${cardId}"]`,
+    `[data-player-id="${playerId}"]`,
+    '✦',
+    'card-flight',
   );
 }
 
@@ -1100,16 +1163,22 @@ function useGameAudio(enabled: boolean) {
 function useDiceRoll(
   dice: readonly PlayerState['dice'][number][] | undefined,
   reducedMotion: boolean,
-): { readonly rolling: boolean; readonly faceFor: (dieId: DieId) => number } {
+): {
+  readonly rolling: boolean;
+  readonly rollKey: number;
+  readonly faceFor: (dieId: DieId) => number;
+} {
   // Signature of the engine's rolled values; a change means fresh dice.
   const signature = (dice ?? [])
     .map((die) => `${die.id}:${die.rolledFaceIndex ?? 'x'}`)
     .join('|');
   const [rolling, setRolling] = useState(false);
   const [tick, setTick] = useState(0);
+  const [rollKey, setRollKey] = useState(0);
 
   useEffect(() => {
     if (reducedMotion || signature === '') return;
+    setRollKey((current) => current + 1);
     setRolling(true);
     const spin = window.setInterval(
       () => setTick((current) => current + 1),
@@ -1133,7 +1202,7 @@ function useDiceRoll(
       hash = (hash * 33 + dieId.charCodeAt(index)) >>> 0;
     return (hash % 6) + 1;
   };
-  return { rolling, faceFor };
+  return { rolling, rollKey, faceFor };
 }
 
 /**
@@ -1344,6 +1413,7 @@ function MomentumMeter({ player }: { readonly player: PlayerState }) {
     <section
       className={`momentum ${length >= 3 ? 'is-hot' : ''}`}
       aria-label="Momentum"
+      data-tutorial="momentum"
     >
       <div className="momentum-head">
         <strong>
@@ -1538,6 +1608,7 @@ export function App() {
   const [difficulty, setDifficulty] = useState<CpuDifficulty>('knight');
   const [game, setGame] = useState<GameState | null>(null);
   const [selectedDieId, setSelectedDieId] = useState<DieId | null>(null);
+  const [draggingDieId, setDraggingDieId] = useState<DieId | null>(null);
   const [upgradeDieId, setUpgradeDieId] = useState<DieId | null>(null);
   const [upgradeFaceIndex, setUpgradeFaceIndex] = useState(0);
   const [log, setLog] = useState<readonly string[]>([]);
@@ -1556,7 +1627,6 @@ export function App() {
   // The realm is the game. Start with the optional information trays closed
   // so a new turn reads as a board game, not as a dashboard of competing panes.
   const [activePanel, setActivePanel] = useState<ActivePanelId>(null);
-  const [tableFocus, setTableFocus] = useState(false);
   const [marketExpanded, setMarketExpanded] = useState(false);
   const [utilitiesOpen, setUtilitiesOpen] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(
@@ -1745,44 +1815,72 @@ export function App() {
         (event): event is Extract<GameEvent, { type: 'die-placed' }> =>
           event.type === 'die-placed',
       );
-      if (!placement) return;
-      const actor = before.players.find(
-        (player) => player.id === placement.playerId,
-      );
-      const die = actor?.dice.find((item) => item.id === placement.dieId);
-      if (actor?.controller === 'human') {
-        throwDieToBoard(
-          placement.dieId,
-          placement.locationId,
-          die ? String(dieValue(die)) : '',
-          die?.affinity ?? 'neutral',
+      if (placement) {
+        const actor = before.players.find(
+          (player) => player.id === placement.playerId,
         );
-      } else {
-        throwPiece(
-          `[data-player-id="${placement.playerId}"] .faction-portrait`,
-          `[data-testid="location-hotspot-${placement.locationId}"]`,
-          die ? String(dieValue(die)) : '◆',
-          `die-flight die-${die?.affinity ?? 'martial'} rival-flight`,
+        const die = actor?.dice.find((item) => item.id === placement.dieId);
+        if (actor?.controller === 'human') {
+          throwDieToBoard(
+            placement.dieId,
+            placement.locationId,
+            die ? String(dieValue(die)) : '',
+            die?.affinity ?? 'neutral',
+          );
+        } else {
+          throwPiece(
+            `[data-player-id="${placement.playerId}"] .faction-portrait`,
+            `[data-testid="location-hotspot-${placement.locationId}"]`,
+            die ? String(dieValue(die)) : '◆',
+            `die-flight die-${die?.affinity ?? 'martial'} rival-flight`,
+          );
+        }
+        window.setTimeout(
+          () => {
+            for (const event of events) {
+              if (
+                event.type === 'resource-gained' &&
+                event.playerId === placement.playerId
+              ) {
+                throwRewardToPlayer(
+                  placement.locationId,
+                  event.playerId,
+                  event.resource,
+                  event.amount,
+                );
+              }
+            }
+          },
+          Math.round(FLIGHT_MS * 0.55),
         );
       }
-      window.setTimeout(
-        () => {
-          for (const event of events) {
-            if (
-              event.type === 'resource-gained' &&
-              event.playerId === placement.playerId
-            ) {
-              throwRewardToPlayer(
-                placement.locationId,
-                event.playerId,
-                event.resource,
-                event.amount,
-              );
-            }
-          }
-        },
-        Math.round(FLIGHT_MS * 0.55),
-      );
+
+      for (const event of events) {
+        if (event.type === 'monster-slain' || event.type === 'raid-damaged') {
+          const selector = `[data-testid="location-hotspot-${event.locationId}"]`;
+          pulseElement(selector, 'combat-impact', 900);
+          burstAt(
+            selector,
+            event.type === 'monster-slain' ? '⚔' : '✦',
+            event.type === 'monster-slain'
+              ? 'combat-burst victory-burst'
+              : 'combat-burst',
+          );
+        }
+        if (event.type === 'die-bumped') {
+          const selector = `[data-testid="location-hotspot-${event.locationId}"]`;
+          pulseElement(selector, 'bump-impact', 850);
+          burstAt(selector, '↯', 'bump-burst');
+        }
+        if (event.type === 'card-acquired' || event.type === 'card-played') {
+          throwCardToPlayer(event.cardId, event.playerId);
+          pulseElement(
+            `[data-player-id="${event.playerId}"]`,
+            'card-impact',
+            720,
+          );
+        }
+      }
     },
     [reducedMotion],
   );
@@ -1955,96 +2053,122 @@ export function App() {
   };
 
   if (!game) {
+    const selectedFactionDetails = factions.find(
+      (faction) => faction.id === selectedFaction,
+    );
     return (
       <main className="setup-shell" style={panelArtStyle(titleHeroArt)}>
         <section className="setup-card">
-          <p className="eyebrow">A high-fantasy dice-placement duel</p>
-          <h1>Realms of the Shattered Crown</h1>
-          <p className="lede">
-            Choose a faction, then play a deterministic six-round match against
-            the CPU.
-          </p>
-          <img
-            alt=""
-            className="setup-portrait"
-            src={FACTION_PORTRAITS[selectedFaction]}
-          />
-          <label>
-            Faction
-            <select
-              value={selectedFaction}
-              onChange={(event) =>
-                setSelectedFaction(event.target.value as FactionId)
-              }
-            >
-              {factions.map((faction) => (
-                <option key={faction.id} value={faction.id}>
-                  {faction.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <p className="ability">
-            {
-              factions.find((faction) => faction.id === selectedFaction)
-                ?.passiveAbility
-            }
-          </p>
-          <p className="ability scoring">
-            <strong>Scores:</strong>{' '}
-            {
-              factions.find((faction) => faction.id === selectedFaction)
-                ?.scoringRule
-            }
-          </p>
-          <label>
-            Opponent
-            <select
-              value={difficulty}
-              onChange={(event) =>
-                setDifficulty(event.target.value as CpuDifficulty)
-              }
-            >
-              {CPU_DIFFICULTIES.map((tier) => (
-                <option key={tier.id} value={tier.id}>
-                  {tier.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <p className="ability scoring">
-            {
-              CPU_DIFFICULTIES.find((tier) => tier.id === difficulty)
-                ?.description
-            }
-          </p>
-          <label>
-            Match seed
-            <input
-              value={seed}
-              onChange={(event) => setSeed(event.target.value)}
-            />
-          </label>
-          <div className="button-row">
-            <button
-              className="primary"
-              type="button"
-              onClick={() => startMatch()}
-            >
-              Start match
-            </button>
-            <button type="button" onClick={() => startMatch(true)}>
-              {tutorialCompleted ? 'Replay guided tutorial' : 'Learn to play'}
-            </button>
-            <button type="button" onClick={resumeMatch}>
-              Resume saved match
-            </button>
-          </div>
-          {error && (
-            <p className="notice" role="status">
-              {error}
+          <header className="setup-intro">
+            <p className="eyebrow">A high-fantasy dice-placement duel</p>
+            <h1>Realms of the Shattered Crown</h1>
+            <p className="lede">
+              Roll your house dice. Claim the realm. Build an engine worthy of
+              the crown before six rounds run out.
             </p>
-          )}
+            <div className="setup-promise" aria-label="Match summary">
+              <span>
+                <strong>6</strong> rounds
+              </span>
+              <span>
+                <strong>5</strong> dice
+              </span>
+              <span>
+                <strong>1</strong> crown
+              </span>
+            </div>
+          </header>
+
+          <div className="setup-config">
+            <fieldset className="faction-picker">
+              <legend>Choose your house</legend>
+              <div className="faction-options">
+                {factions.map((faction) => (
+                  <button
+                    aria-pressed={selectedFaction === faction.id}
+                    className={
+                      selectedFaction === faction.id ? 'is-selected' : ''
+                    }
+                    key={faction.id}
+                    onClick={() => setSelectedFaction(faction.id)}
+                    type="button"
+                  >
+                    <img alt="" src={FACTION_PORTRAITS[faction.id]} />
+                    <span>{faction.name}</span>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            <article className="setup-selection">
+              <img
+                alt=""
+                className="setup-portrait"
+                src={FACTION_PORTRAITS[selectedFaction]}
+              />
+              <div>
+                <span className="eyebrow">Your house</span>
+                <h2>{selectedFactionDetails?.name}</h2>
+                <p className="ability">
+                  {selectedFactionDetails?.passiveAbility}
+                </p>
+                <p className="ability scoring">
+                  <strong>Legacy:</strong> {selectedFactionDetails?.scoringRule}
+                </p>
+              </div>
+            </article>
+
+            <div className="setup-options">
+              <label>
+                Opponent
+                <select
+                  value={difficulty}
+                  onChange={(event) =>
+                    setDifficulty(event.target.value as CpuDifficulty)
+                  }
+                >
+                  {CPU_DIFFICULTIES.map((tier) => (
+                    <option key={tier.id} value={tier.id}>
+                      {tier.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Match seed
+                <input
+                  value={seed}
+                  onChange={(event) => setSeed(event.target.value)}
+                />
+              </label>
+            </div>
+            <p className="setup-difficulty">
+              {
+                CPU_DIFFICULTIES.find((tier) => tier.id === difficulty)
+                  ?.description
+              }
+            </p>
+            <div className="button-row setup-actions">
+              <button
+                className="primary"
+                type="button"
+                onClick={() => startMatch()}
+              >
+                Start match
+              </button>
+              <button type="button" onClick={() => startMatch(true)}>
+                {tutorialCompleted ? 'Replay guided tutorial' : 'Learn to play'}
+              </button>
+              <button type="button" onClick={resumeMatch}>
+                Resume saved match
+              </button>
+            </div>
+            {error && (
+              <p className="notice" role="status">
+                {error}
+              </p>
+            )}
+          </div>
         </section>
       </main>
     );
@@ -2052,7 +2176,7 @@ export function App() {
 
   return (
     <main
-      className={`game-shell ${reducedMotion ? 'reduced-motion' : ''} ${tableFocus ? 'table-focus' : ''} ${callout ? `event-active event-${callout.tone}` : ''}`}
+      className={`game-shell phase-${game.phase} ${reducedMotion ? 'reduced-motion' : ''} ${selectedDieId ? 'is-planning' : ''} ${pinnedLocationId ? 'is-inspecting' : ''} ${activePlayer?.controller === 'cpu' ? 'is-cpu-turn' : 'is-human-turn'} ${callout ? `event-active event-${callout.tone}` : ''}`}
       style={tableArtStyle()}
     >
       {callout && (
@@ -2102,8 +2226,16 @@ export function App() {
             })}
           </span>
         </div>
-        <div className={`button-row compact ${utilitiesOpen ? 'is-open' : ''}`}>
-          <button type="button" onClick={() => setTutorialOpen(true)}>
+        <div
+          aria-label="Game menu"
+          className={`button-row compact ${utilitiesOpen ? 'is-open' : ''}`}
+          data-tutorial="menu"
+        >
+          <button
+            className="utility-secondary"
+            type="button"
+            onClick={() => setTutorialOpen(true)}
+          >
             How to play
           </button>
           <button
@@ -2128,14 +2260,6 @@ export function App() {
           </button>
           <button
             className="utility-secondary"
-            aria-pressed={tableFocus}
-            type="button"
-            onClick={() => setTableFocus((current) => !current)}
-          >
-            {tableFocus ? 'Show command deck' : 'Focus board'}
-          </button>
-          <button
-            className="utility-secondary"
             type="button"
             onClick={saveMatch}
           >
@@ -2154,7 +2278,8 @@ export function App() {
             type="button"
             onClick={() => setUtilitiesOpen((current) => !current)}
           >
-            {utilitiesOpen ? 'Less' : 'More'}
+            <span aria-hidden="true">☰</span>
+            {utilitiesOpen ? 'Close' : 'Menu'}
           </button>
         </div>
       </header>
@@ -2352,7 +2477,7 @@ export function App() {
       ) : (
         <div className="play-area">
           <section
-            className="board-stage"
+            className={`board-stage ${selectedDieId ? 'is-targeting' : ''} ${pinnedLocationId ? 'has-inspection' : ''}`}
             aria-label="Fantasy board"
             data-tutorial="board"
           >
@@ -2380,7 +2505,11 @@ export function App() {
               />
             )}
             {human && human.hand.length > 0 && (
-              <section className="hand-dock" aria-label="Your card hand">
+              <section
+                className="hand-dock"
+                aria-label="Your card hand"
+                data-tutorial="hand"
+              >
                 <div className="hand-dock-heading">
                   <span className="eyebrow">Your hand</span>
                   <strong>{human.hand.length}</strong>
@@ -2401,6 +2530,7 @@ export function App() {
                     return (
                       <article
                         className={`hand-dock-card hand-dock-${card.category}`}
+                        data-card-id={card.id}
                         key={`${cardId}-${index}`}
                         style={cardArtStyle(card.category)}
                       >
@@ -2529,108 +2659,122 @@ export function App() {
           )}
 
           <aside className="sidebar" data-tutorial="war-table">
-            <section className="dice-panel" style={diceTrayStyle()}>
+            <section
+              className="dice-panel"
+              data-tutorial="tray"
+              style={diceTrayStyle()}
+            >
               <h2>Your dice</h2>
               <p>Select a ready die, then choose a highlighted slot.</p>
-              <div className="dice" data-tutorial="dice">
-                {human?.dice.map((die) => {
-                  const affinity = AFFINITY_INFO[die.affinity];
-                  const boost = die.valueBonus ?? 0;
-                  const settled =
-                    die.rolledFaceIndex === null ? '—' : dieValue(die);
-                  // While tumbling, show throwaway faces so the roll reads as
-                  // a roll. The settled value is what every rule uses.
-                  const value =
-                    diceRoll.rolling && die.rolledFaceIndex !== null
-                      ? diceRoll.faceFor(die.id)
-                      : settled;
-                  const rolledFace =
-                    die.rolledFaceIndex === null
-                      ? null
-                      : (die.faces[die.rolledFaceIndex] ?? null);
-                  const symbolSummary = rolledFace?.symbols.length
-                    ? ` Face grants ${rolledFace.symbols.map(symbolLabel).join(' and ')}.`
-                    : '';
-                  const forgedSummary = die.enhancements.length
-                    ? ` ${die.enhancements.length} forged face${die.enhancements.length === 1 ? '' : 's'} installed.`
-                    : '';
-                  const classes = [
-                    'die',
-                    `die-${die.affinity}`,
-                    selectedDieId === die.id ? 'selected' : '',
-                    boost > 0 ? 'boosted' : '',
-                    die.enhancements.length ? 'forged' : '',
-                    diceRoll.rolling && die.rolledFaceIndex !== null
-                      ? 'rolling'
-                      : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ');
-                  return (
-                    <button
-                      aria-label={`${affinity.label} die, value ${value}${
-                        selectedDieId === die.id ? ', selected' : ''
-                      }`}
-                      aria-pressed={selectedDieId === die.id}
-                      className={classes}
-                      data-die-id={die.id}
-                      data-tooltip={`${affinity.label}: ${affinity.description}${symbolSummary}${forgedSummary}`}
-                      disabled={
-                        die.status !== 'ready' ||
-                        activePlayer?.controller !== 'human'
-                      }
-                      draggable={
-                        die.status === 'ready' &&
-                        activePlayer?.controller === 'human'
-                      }
-                      onDragStart={(event) => {
-                        event.dataTransfer.setData(
-                          'application/x-shattered-die',
-                          die.id,
-                        );
-                        selectDieForPlanning(die.id);
-                      }}
-                      key={die.id}
-                      onClick={() => selectDieForPlanning(die.id)}
-                      type="button"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={`die-art die-art-${die.affinity}`}
+              <div className="player-pieces">
+                <div className="dice" data-tutorial="dice">
+                  {human?.dice.map((die) => {
+                    const affinity = AFFINITY_INFO[die.affinity];
+                    const boost = die.valueBonus ?? 0;
+                    const settled =
+                      die.rolledFaceIndex === null ? '—' : dieValue(die);
+                    // While tumbling, show throwaway faces so the roll reads as
+                    // a roll. The settled value is what every rule uses.
+                    const value =
+                      diceRoll.rolling && die.rolledFaceIndex !== null
+                        ? diceRoll.faceFor(die.id)
+                        : settled;
+                    const rolledFace =
+                      die.rolledFaceIndex === null
+                        ? null
+                        : (die.faces[die.rolledFaceIndex] ?? null);
+                    const symbolSummary = rolledFace?.symbols.length
+                      ? ` Face grants ${rolledFace.symbols.map(symbolLabel).join(' and ')}.`
+                      : '';
+                    const forgedSummary = die.enhancements.length
+                      ? ` ${die.enhancements.length} forged face${die.enhancements.length === 1 ? '' : 's'} installed.`
+                      : '';
+                    const classes = [
+                      'die',
+                      `die-${die.affinity}`,
+                      selectedDieId === die.id ? 'selected' : '',
+                      draggingDieId === die.id ? 'dragging' : '',
+                      boost > 0 ? 'boosted' : '',
+                      die.enhancements.length ? 'forged' : '',
+                      diceRoll.rolling && die.rolledFaceIndex !== null
+                        ? 'rolling'
+                        : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ');
+                    return (
+                      <button
+                        aria-label={`${affinity.label} die, value ${value}${
+                          selectedDieId === die.id ? ', selected' : ''
+                        }`}
+                        aria-pressed={selectedDieId === die.id}
+                        className={classes}
+                        data-die-id={die.id}
+                        data-tooltip={`${affinity.label}: ${affinity.description}${symbolSummary}${forgedSummary}`}
+                        disabled={
+                          die.status !== 'ready' ||
+                          activePlayer?.controller !== 'human'
+                        }
+                        draggable={
+                          die.status === 'ready' &&
+                          activePlayer?.controller === 'human'
+                        }
+                        onDragStart={(event) => {
+                          setDraggingDieId(die.id);
+                          event.dataTransfer.setData(
+                            'application/x-shattered-die',
+                            die.id,
+                          );
+                          selectDieForPlanning(die.id);
+                        }}
+                        onDragEnd={() => setDraggingDieId(null)}
+                        key={die.id}
+                        onClick={() => selectDieForPlanning(die.id)}
+                        type="button"
                       >
-                        <img alt="" src={fantasyDiceAtlasV1} />
-                      </span>
-                      <span aria-hidden="true" className="die-glyph">
-                        <GameIcon name={affinity.icon} />
-                      </span>
-                      <strong>{value}</strong>
-                      {boost > 0 && <span className="die-boost">+{boost}</span>}
-                      {rolledFace?.symbols.length ? (
-                        <span className="die-symbols" aria-hidden="true">
-                          {rolledFace.symbols.map((symbol, index) => (
-                            <span
-                              className={`die-symbol die-symbol-${symbol}`}
-                              key={`${symbol}-${index}`}
-                            >
-                              <GameIcon name={symbolIcon(symbol)} />
-                            </span>
-                          ))}
-                        </span>
-                      ) : null}
-                      {die.enhancements.length ? (
                         <span
-                          aria-label={`${die.enhancements.length} forged face${die.enhancements.length === 1 ? '' : 's'} installed`}
-                          className="die-forged-badge"
+                          aria-hidden="true"
+                          className={`die-art die-art-${die.affinity}`}
                         >
-                          {die.enhancements.length}
+                          <img alt="" src={fantasyDiceAtlasV1} />
                         </span>
-                      ) : null}
-                      <span className="die-affinity">{affinity.label}</span>
-                    </button>
-                  );
-                })}
+                        {diceRoll.rolling && die.rolledFaceIndex !== null && (
+                          <span aria-hidden="true" className="die-roll-flare" />
+                        )}
+                        <span aria-hidden="true" className="die-glyph">
+                          <GameIcon name={affinity.icon} />
+                        </span>
+                        <strong>{value}</strong>
+                        {boost > 0 && (
+                          <span className="die-boost">+{boost}</span>
+                        )}
+                        {rolledFace?.symbols.length ? (
+                          <span className="die-symbols" aria-hidden="true">
+                            {rolledFace.symbols.map((symbol, index) => (
+                              <span
+                                className={`die-symbol die-symbol-${symbol}`}
+                                key={`${symbol}-${index}`}
+                              >
+                                <GameIcon name={symbolIcon(symbol)} />
+                              </span>
+                            ))}
+                          </span>
+                        ) : null}
+                        {die.enhancements.length ? (
+                          <span
+                            aria-label={`${die.enhancements.length} forged face${die.enhancements.length === 1 ? '' : 's'} installed`}
+                            className="die-forged-badge"
+                          >
+                            {die.enhancements.length}
+                          </span>
+                        ) : null}
+                        <span className="die-affinity">{affinity.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {human && <MomentumMeter player={human} />}
               </div>
-              {human && <MomentumMeter player={human} />}
               {human && activePlayer?.controller === 'human' && (
                 <>
                   <MoveAdvisor
@@ -2665,7 +2809,11 @@ export function App() {
                       : 'Select a die to light up playable spaces.'}
                   </span>
                 </div>
-                <div className="panel-shortcuts" aria-label="Open info panels">
+                <div
+                  className="panel-shortcuts"
+                  aria-label="Open info panels"
+                  data-tutorial="drawers"
+                >
                   {PANEL_SHORTCUTS.map((shortcut) => {
                     // A dot means there is an action waiting behind that tab,
                     // so the player does not have to open all five to find out
@@ -2899,6 +3047,7 @@ export function App() {
                   return (
                     <article
                       className="game-card hand-card"
+                      data-card-id={card.id}
                       key={`${cardId}-${index}`}
                       style={cardArtStyle(card.category)}
                     >
@@ -2945,6 +3094,7 @@ export function App() {
                   return (
                     <article
                       className="game-card market-card"
+                      data-card-id={card.id}
                       key={`${cardId}-${index}`}
                       style={cardArtStyle(card.category)}
                     >

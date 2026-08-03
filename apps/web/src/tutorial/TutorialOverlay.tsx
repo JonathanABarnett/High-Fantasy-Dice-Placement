@@ -18,59 +18,75 @@ interface TutorialStep {
 const STEPS: readonly TutorialStep[] = [
   {
     anchor: 'header',
-    eyebrow: 'Welcome, sovereign',
+    eyebrow: 'The match begins',
     title: 'Claim the Shattered Crown',
     symbol: '♛',
-    body: 'You and the CPU compete across six rounds. Every action spends a turn, so timing matters as much as raw power.',
-    tip: 'The first-player marker alternates each round.',
+    body: 'You and the CPU have six rounds to build the stronger realm. The compact header keeps the current round, active player, camera controls, and menu visible without shrinking the board.',
+    tip: 'Most actions spend your turn. Read who acts next before committing a die or card.',
   },
   {
     anchor: 'players',
-    eyebrow: 'Your realm',
-    title: 'Read the live standing',
+    eyebrow: 'The score race',
+    title: 'Track score and resources',
     symbol: '◈',
-    body: 'The player strip shows the real current score, not just victory-point tokens. Gold, mana, knowledge, materials, and influence are inputs for locations, cards, and upgrades, and reserves can still matter at scoring.',
-    tip: 'The loud number answers “am I winning?”; the small resource icons answer “what can I afford?”',
+    body: 'The two house strips show the live total score and each player’s resources. The large number answers who is winning; the smaller icons show what each player can afford right now.',
+    tip: 'The displayed total already includes every scoring source the game can currently calculate.',
+  },
+  {
+    anchor: 'tray',
+    eyebrow: 'Your command surface',
+    title: 'Start every turn in the tray',
+    symbol: '◇',
+    body: 'Your physical tray holds the pieces and controls that matter this turn: dice, momentum, the current action, system shortcuts, and Pass. It stays along the bottom edge so the realm remains the main surface.',
+    tip: 'A glowing dot on a shortcut means a real action is waiting behind it.',
   },
   {
     anchor: 'dice',
     eyebrow: 'Your workers',
-    title: 'Read and select your dice',
+    title: 'Lift a die to plan',
     symbol: '⚄',
-    body: 'Each die has a rolled value and an affinity. Select a ready die here; the board will glow wherever that die can legally go.',
-    tip: 'A placed die stays occupied until the round ends.',
-  },
-  {
-    anchor: 'dice',
-    eyebrow: 'Keep the table clear',
-    title: 'Use the command center',
-    symbol: '◇',
-    body: 'Your dice, momentum, pass button, and drawer shortcuts live together because they are the controls you use every round. The drawer shows one support panel at a time.',
-    tip: 'A glowing dot on Cards or Forge means a real turn-spending action is available there.',
+    body: 'Each die has a rolled value and affinity. Select or drag a ready die and the interface enters planning mode: legal destinations illuminate, blocked routes turn red, and the best available routes rise above the tray.',
+    tip: 'Select the same die again to clear your plan. A committed die remains on the board until the round ends.',
   },
   {
     anchor: 'board',
-    eyebrow: 'The realm',
-    title: 'Place dice to gain rewards',
+    eyebrow: 'Read the realm',
+    title: 'Follow the legal glow',
     symbol: '⌖',
-    body: 'Choose a glowing location after selecting a die. Empty slots may demand a minimum value, affinity, or resource payment.',
-    tip: 'Placements that share a theme build momentum. A three-link run starts scoring bonus points, so sequence matters.',
+    body: 'The realm is always the main play surface. After choosing a die, green locations can accept it and red slots explain a restriction. Click a legal location or drag the die directly onto it to commit.',
+    tip: 'Use the Atlas pills to jump between regions and the mouse wheel to zoom without leaving the table.',
   },
   {
-    anchor: 'preview',
+    anchor: 'board',
     eyebrow: 'Plan before committing',
-    title: 'Inspect rewards and restrictions',
+    title: 'Pin a location for full details',
     symbol: '☰',
-    body: 'Hover or click a location to pin its reward and slot requirements near your dice. With a die selected, this panel explains why each slot is playable, blocked, full, or bumpable.',
-    tip: 'The reward and requirement icons here have their own hover and keyboard-focus explanations, so you do not have to chase tiny symbols on the map.',
+    body: 'Click any location without placing to pin its contextual drawer. That drawer enlarges its reward, requirements, occupants, encounters, and the exact reason each slot is playable, blocked, full, or bumpable.',
+    tip: 'Only one decision layer is shown at a time. Pinning a location dismisses the route advisor so the board never becomes a stack of windows.',
   },
   {
-    anchor: 'preview',
-    eyebrow: 'Keep the table clear',
-    title: 'Open only the panels you need',
+    anchor: 'momentum',
+    eyebrow: 'Sequence creates power',
+    title: 'Chain placements into momentum',
+    symbol: '⟡',
+    body: 'Locations carry themes. Place into the same theme repeatedly during a round to build a run. The momentum meter advances inside your tray and begins awarding bonus points when the chain reaches three.',
+    tip: 'The order of otherwise legal moves matters: break a theme and the run starts over.',
+  },
+  {
+    anchor: 'hand',
+    eyebrow: 'Schemes in reach',
+    title: 'Play directly from your hand',
+    symbol: '✦',
+    body: 'Your hand sits just above the tray as a row of physical cards. Hover to raise a card, play it directly, or open Cards for the larger hand-and-market drawer.',
+    tip: 'Some cards require a ready die as their target. Select that die before playing the card.',
+  },
+  {
+    anchor: 'drawers',
+    eyebrow: 'Depth on demand',
+    title: 'Open one system drawer at a time',
     symbol: '▾',
-    body: 'Use the drawer shortcuts to switch between Cards, Quests, Forge, Pressure, and Log. The location decision dock stays near the board, so placement details do not disappear when you check another panel.',
-    tip: 'The board, dice, and decision dock are your main loop. The drawer is supporting information.',
+    body: 'Cards, Quests, Forge, Log, and Pressure are supporting systems, not permanent columns. Their tray shortcuts open one focused drawer over the realm and close it when selected again.',
+    tip: 'Check a system, make the decision, then return to the realm. The table should never require scanning five panels at once.',
   },
   {
     anchor: 'hunt-location',
@@ -97,14 +113,6 @@ const STEPS: readonly TutorialStep[] = [
     tip: 'Their die returns to them ready to use again, so bumping costs you influence and a strong die rather than destroying theirs.',
   },
   {
-    anchor: 'cards',
-    eyebrow: 'Schemes and allies',
-    title: 'Play cards, buy engines',
-    symbol: '✦',
-    body: 'Your faction begins with a unique card. Playing or acquiring a card uses your turn. The market includes immediate tactics plus payoff cards that cash in monsters slain, combat placements, and forged die faces.',
-    tip: 'Some cards need a ready die selected as their target. Use the Cards shortcut when it has a dot, then return to the board.',
-  },
-  {
     anchor: 'forge-location',
     eyebrow: 'Permanent power',
     title: 'Unlock upgrades at Forge Hall',
@@ -113,7 +121,7 @@ const STEPS: readonly TutorialStep[] = [
     tip: 'Cheap faces make bad rolls reliable, high faces reach harder slots, dual-symbol faces generate resources, and masterwork faces score when placed.',
   },
   {
-    anchor: 'quests',
+    anchor: 'drawers',
     eyebrow: 'Race the realm',
     title: 'Claim the Crown Quests first',
     symbol: '★',
@@ -129,12 +137,12 @@ const STEPS: readonly TutorialStep[] = [
     tip: 'You cannot act again after passing, even if the CPU keeps playing.',
   },
   {
-    anchor: 'log',
-    eyebrow: 'The final reckoning',
-    title: 'Follow the log and build your score',
+    anchor: 'menu',
+    eyebrow: 'Leave the table clean',
+    title: 'Use the menu, log, and final reckoning',
     symbol: '♜',
-    body: 'Big swings appear as callouts over the board. Open the log when you want to verify exactly what resolved, then return to the current turn.',
-    tip: 'After round six, victory points, reserves, faction scoring, played allies and relics, and die enhancements are totaled. Same seed and choices, same match.',
+    body: 'Menu keeps tutorial, motion, sound, save, and restart controls away from play. Use Log in the tray when you need to audit an event. After round six, the table gives way to a full-screen coronation and score breakdown.',
+    tip: 'The same seed and the same choices always produce the same match, so saves and replays remain trustworthy.',
   },
 ];
 
@@ -171,12 +179,27 @@ export function TutorialOverlay({
         return;
       }
       const rect = target.getBoundingClientRect();
+      if (rect.width < 2 || rect.height < 2) {
+        setFocusRect(null);
+        return;
+      }
       const padding = 8;
+      const width = Math.min(window.innerWidth - 16, rect.width + padding * 2);
+      const height = Math.min(
+        window.innerHeight - 16,
+        rect.height + padding * 2,
+      );
       setFocusRect({
-        top: Math.max(8, rect.top - padding),
-        left: Math.max(8, rect.left - padding),
-        width: Math.min(window.innerWidth - 16, rect.width + padding * 2),
-        height: Math.min(window.innerHeight - 16, rect.height + padding * 2),
+        top: Math.min(
+          Math.max(8, rect.top - padding),
+          window.innerHeight - height - 8,
+        ),
+        left: Math.min(
+          Math.max(8, rect.left - padding),
+          window.innerWidth - width - 8,
+        ),
+        width,
+        height,
       });
       target.scrollIntoView({
         behavior: reducedMotion ? 'auto' : 'smooth',
@@ -218,6 +241,9 @@ export function TutorialOverlay({
         '--tutorial-height': `${focusRect.height}px`,
       } as CSSProperties)
     : undefined;
+  const dialogPlacement = focusRect
+    ? `${focusRect.top + focusRect.height / 2 > window.innerHeight * 0.52 ? 'top' : 'bottom'}-${focusRect.left + focusRect.width / 2 > window.innerWidth / 2 ? 'left' : 'right'}`
+    : 'bottom-right';
   return (
     <div className="tutorial-layer" data-testid="tutorial-overlay">
       {focusRect && (
@@ -228,7 +254,7 @@ export function TutorialOverlay({
       <section
         aria-describedby="tutorial-description"
         aria-labelledby="tutorial-title"
-        className="tutorial-dialog"
+        className={`tutorial-dialog place-${dialogPlacement}`}
         role="dialog"
       >
         <button
