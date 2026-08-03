@@ -993,6 +993,7 @@ select {
     width: 100%;
   }
 }
+
 .board-stage {
   grid-area: realm;
   position: relative;
@@ -5567,6 +5568,7 @@ select {
   .game-shell .dice-panel,
   .game-shell.table-focus .dice-panel {
     position: relative;
+    z-index: 40;
     top: auto;
     right: auto;
     bottom: auto;
@@ -6472,5 +6474,224 @@ select {
     width: 100%;
     max-height: none;
     transform: none;
+  }
+}
+
+/* Live desktop composition: board first, one command rail, one modal layer. */
+@media (min-width: 821px) {
+  .game-shell .sidebar {
+    z-index: 40;
+  }
+
+  .game-shell {
+    display: grid;
+    grid-template-rows: 3.25rem minmax(0, 1fr);
+    gap: 0.3rem;
+    padding: 0.45rem;
+  }
+
+  .game-shell .game-header {
+    position: relative;
+    top: auto;
+    right: auto;
+    left: auto;
+    grid-row: 1;
+    min-height: 3.25rem;
+    padding-block: 0;
+  }
+
+  .game-shell .player-strip {
+    position: absolute;
+    z-index: 35;
+    top: 4.15rem;
+    left: 50%;
+    width: min(52rem, calc(100% - 34rem));
+    transform: translateX(-50%);
+  }
+
+  .game-shell .player {
+    min-height: 2.9rem;
+    padding: 0.28rem 0.48rem;
+    background: rgb(6 10 11 / 78%);
+    box-shadow: 0 0.7rem 2rem rgb(0 0 0 / 42%);
+  }
+
+  .game-shell .faction-portrait {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .game-shell .player-identity > .resources {
+    margin-top: 0;
+  }
+
+  .game-shell .player-score > strong {
+    font-size: 1.35rem;
+  }
+
+  .game-shell .play-area,
+  .game-shell.table-focus .play-area {
+    grid-row: 2;
+    display: grid;
+    grid-template-areas:
+      'realm'
+      'player-board';
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 0.35rem;
+    height: 100%;
+  }
+
+  .game-shell .board-stage,
+  .game-shell.table-focus .board-stage {
+    grid-area: realm;
+    background: radial-gradient(
+      circle at 50% 45%,
+      #102021 0,
+      #081112 58%,
+      #05090a 100%
+    );
+    box-shadow: none;
+  }
+
+  .game-shell .board-stage.is-targeting {
+    box-shadow: none;
+  }
+
+  .game-shell .pixi-board,
+  .game-shell.table-focus .pixi-board {
+    width: min(100%, calc((100dvh - 12rem) * 1.5));
+    height: auto;
+    max-height: 100%;
+    box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 48%);
+  }
+
+  .game-shell .placement-guide {
+    display: none;
+  }
+
+  .game-shell .board-stage.is-targeting .placement-guide {
+    border-color: rgb(109 238 167 / 34%);
+    box-shadow: 0 0.55rem 1.5rem rgb(0 0 0 / 45%);
+  }
+
+  .game-shell .dice-panel,
+  .game-shell.table-focus .dice-panel {
+    position: relative;
+    z-index: 40;
+    inset: auto;
+    grid-area: auto;
+    grid-template-columns: minmax(23rem, auto) minmax(24rem, 28rem) minmax(
+        18rem,
+        1fr
+      );
+    justify-self: center;
+    width: min(90rem, 100%);
+    min-height: 8rem;
+    max-height: 8.2rem;
+    padding: 0.48rem 0.58rem 0.68rem;
+    overflow: hidden;
+    border-color: rgb(255 255 255 / 10%);
+    border-radius: 0.85rem;
+    background: rgb(7 10 11 / 94%);
+    box-shadow: 0 0.8rem 2.8rem rgb(0 0 0 / 55%);
+    transform: none;
+  }
+
+  .game-shell .hand-dock-card {
+    min-height: 4.25rem;
+    max-height: 4.25rem;
+  }
+
+  .game-shell .hand-dock {
+    min-height: 0;
+    max-height: 100%;
+    overflow: hidden;
+  }
+
+  .game-shell .hand-dock-cards {
+    min-height: 0;
+    overflow: auto hidden;
+  }
+
+  .game-shell .dice-panel:has(.turn-summary.is-armed) .move-advisor,
+  .game-shell .dice-panel:has(.turn-summary.is-armed) .move-advisor.empty {
+    box-sizing: border-box;
+    height: 7rem;
+    min-height: 0;
+    max-height: 7rem;
+    overflow: auto hidden;
+  }
+
+  .game-shell .turn-summary {
+    min-height: 0;
+  }
+
+  .game-shell .atlas-nav {
+    bottom: 0.65rem;
+  }
+
+  .game-shell .accessible-actions {
+    bottom: calc(100% + 0.4rem);
+  }
+
+  .game-shell .pressure-panel.is-open,
+  .game-shell .quest-panel.is-open,
+  .game-shell .forge-panel.is-open,
+  .game-shell .log-panel.is-open {
+    position: fixed;
+    z-index: 90;
+    top: 50%;
+    right: auto;
+    bottom: auto;
+    left: 50%;
+    width: min(46rem, calc(100vw - 3rem));
+    max-height: min(38rem, calc(100dvh - 8rem));
+    margin: 0;
+    overflow: auto;
+    box-shadow:
+      0 0 0 100vmax rgb(0 0 0 / 68%),
+      0 2rem 6rem #000;
+    transform: translate(-50%, -50%);
+  }
+
+  .game-shell .card-panel.is-open {
+    position: fixed;
+    z-index: 90;
+    top: 50%;
+    right: auto;
+    bottom: auto;
+    left: 50%;
+    width: min(76rem, calc(100vw - 3rem));
+    max-height: min(42rem, calc(100dvh - 7rem));
+    margin: 0;
+    overflow: auto;
+    box-shadow:
+      0 0 0 100vmax rgb(0 0 0 / 68%),
+      0 2rem 6rem #000;
+    transform: translate(-50%, -50%);
+  }
+
+  .game-shell:has(
+      .pressure-panel.is-open,
+      .quest-panel.is-open,
+      .card-panel.is-open,
+      .forge-panel.is-open,
+      .log-panel.is-open
+    )
+    .dice-panel {
+    opacity: 0.22;
+    pointer-events: none;
+  }
+}
+
+@media (min-width: 821px) and (max-width: 1240px) {
+  .game-shell .player-strip {
+    width: min(44rem, calc(100% - 8rem));
+  }
+
+  .game-shell .dice-panel,
+  .game-shell.table-focus .dice-panel {
+    grid-template-columns: minmax(22rem, auto) minmax(17rem, 1fr);
+    max-height: none;
   }
 }

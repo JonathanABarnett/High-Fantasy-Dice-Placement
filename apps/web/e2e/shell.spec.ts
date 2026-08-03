@@ -35,14 +35,18 @@ test('starts a deterministic human-versus-CPU match', async ({ page }) => {
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.locator('.placement-guide')).toBeHidden();
   await page.locator('.die:not([disabled])').first().click();
-  await expect(page.locator('.placement-guide')).toBeVisible();
-  await expect(page.locator('.placement-guide')).toContainText(
-    /Value \d [A-Za-z]+ die selected/,
-  );
+  await expect(page.locator('.move-advisor')).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: /Place at/ }).first(),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Pressure' }).click();
   await expect(
     page.getByRole('region', { name: 'Round pressure' }),
   ).toContainText('8/8 slots left');
+  await page
+    .getByRole('region', { name: 'Round pressure' })
+    .getByRole('button', { name: 'Close' })
+    .click();
   await page.getByRole('button', { name: 'Log' }).click();
   await expect(page.locator('.log-panel')).toContainText('entries');
 });
@@ -78,7 +82,10 @@ test('reserves separate space for the board and command rail', async ({
   expect(turnPlan).not.toBeNull();
 
   expect(header!.y + header!.height).toBeLessThanOrEqual(players!.y + 1);
-  expect(players!.y + players!.height).toBeLessThanOrEqual(board!.y + 1);
+  expect(players!.y).toBeGreaterThanOrEqual(board!.y);
+  expect(players!.y + players!.height).toBeLessThanOrEqual(
+    board!.y + board!.height,
+  );
   const verticalGeometry = JSON.stringify({ header, players, board, tray });
   expect(board!.y + board!.height, verticalGeometry).toBeLessThanOrEqual(
     tray!.y + 1,
@@ -108,6 +115,25 @@ test('reserves separate space for the board and command rail', async ({
   expect(advisor!.y + advisor!.height).toBeLessThanOrEqual(
     tray!.y + tray!.height,
   );
+
+  // Selecting the same die clears planning and restores the hand. Managing it
+  // opens one centered modal instead of wedging a drawer behind the rail.
+  await page.locator('.die.selected').click();
+  await expect(page.locator('.hand-dock')).toBeVisible();
+  await page
+    .getByRole('button', { name: 'View full hand and card market' })
+    .click();
+  const cardsModal = page.getByRole('region', {
+    name: 'Card hand and market',
+  });
+  const modalBox = await cardsModal.boundingBox();
+  expect(modalBox).not.toBeNull();
+  expect(modalBox!.x).toBeGreaterThanOrEqual(0);
+  expect(modalBox!.y).toBeGreaterThanOrEqual(0);
+  expect(modalBox!.x + modalBox!.width).toBeLessThanOrEqual(2048);
+  expect(modalBox!.y + modalBox!.height).toBeLessThanOrEqual(1096);
+  await cardsModal.getByRole('button', { name: 'Close' }).click();
+  await expect(cardsModal).toBeHidden();
 });
 
 test('keeps the realm full-width at the compact table breakpoint', async ({
@@ -180,13 +206,21 @@ test('explains resources and clearly marks die placement routes', async ({
   await page.locator('.panel-shortcut').filter({ hasText: 'Cards' }).click();
   const category = page.locator('.category-token').first();
   await expect(category).toHaveAttribute('data-tooltip', /one-use effect/i);
+  await page
+    .getByRole('region', { name: 'Card hand and market' })
+    .getByRole('button', { name: 'Close' })
+    .click();
 
   await page.locator('.die:not([disabled])').first().click();
-  const guide = page.locator('.placement-guide');
-  await expect(guide).toContainText(/Value \d [A-Za-z]+ die selected/);
-  await expect(guide).toContainText(/\d+ glowing locations can accept it/);
-  await expect(guide).toContainText('Playable');
-  await expect(guide).toContainText('Blocked');
+  await expect(page.locator('.move-advisor')).toContainText(
+    'Best routes for this die',
+  );
+  await expect(
+    page.getByRole('button', { name: /Place at/ }).first(),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: /Inspect/ }).first(),
+  ).toBeVisible();
 });
 
 test('pins location details and exposes preview icon explanations', async ({
@@ -244,7 +278,7 @@ test('guides a new player through the complete visual tutorial', async ({
     'Track score and resources',
     'Start every turn in the tray',
     'Lift a die to plan',
-    'Follow the legal glow',
+    'Follow the highlighted slots',
     'Pin a location for full details',
     'Chain placements into momentum',
     'Play directly from your hand',
@@ -287,12 +321,15 @@ test('supports keyboard-accessible placement controls', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Start match' }).click();
   await page.locator('.die:not([disabled])').first().click();
-  await page.getByText('Keyboard placement options').click();
+  const keyboardOptions = page.getByText('Keyboard placement options');
+  await keyboardOptions.focus();
+  await keyboardOptions.press('Enter');
   const legalLocation = page
     .locator('.accessible-actions button:not([disabled])')
     .first();
   await expect(legalLocation).toBeEnabled();
-  await legalLocation.click();
+  await legalLocation.focus();
+  await legalLocation.press('Enter');
   const log = await openMatchLog(page);
   await expect(log.getByText(/Player placed a die at/).first()).toBeVisible();
 });
@@ -328,12 +365,15 @@ test('unlocks Forge Hall and permanently upgrades a die face', async ({
       .fill(`shattered-crown-${seedIndex.toString().padStart(3, '0')}`);
     await page.getByRole('button', { name: 'Start match' }).click();
     await page.locator('.die:not([disabled])').first().click();
-    await page.getByText('Keyboard placement options').click();
+    const keyboardOptions = page.getByText('Keyboard placement options');
+    await keyboardOptions.focus();
+    await keyboardOptions.press('Enter');
     const forgeRoute = page
       .locator('.accessible-actions button')
       .filter({ hasText: 'Forge Hall' });
     if (await forgeRoute.isEnabled()) {
-      await forgeRoute.click();
+      await forgeRoute.focus();
+      await forgeRoute.press('Enter');
       foundForgeRoute = true;
     }
   }

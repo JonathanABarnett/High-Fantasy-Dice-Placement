@@ -1278,17 +1278,15 @@ function CollapsiblePanel({
       <div className="panel-heading collapsible-heading">
         <Heading>{title}</Heading>
         <span className="panel-summary">{summary}</span>
-        {!open && (
-          <button
-            aria-controls={contentId}
-            aria-expanded={open}
-            className="panel-toggle"
-            onClick={onToggle}
-            type="button"
-          >
-            Open
-          </button>
-        )}
+        <button
+          aria-controls={contentId}
+          aria-expanded={open}
+          className="panel-toggle"
+          onClick={onToggle}
+          type="button"
+        >
+          {open ? 'Close' : 'Open'}
+        </button>
       </div>
       {open && (
         <div className="collapsible-content" id={contentId}>
@@ -1676,6 +1674,9 @@ export function App() {
       setSelectedDieId(null);
       setPinnedLocationId(null);
       setHoveredLocationId(null);
+      setActivePanel(null);
+      setUtilitiesOpen(false);
+      setTutorialOpen(false);
     };
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
@@ -1727,9 +1728,9 @@ export function App() {
   const pinLocation = (locationId: LocationId | null) => {
     setPinnedLocationId(locationId);
   };
-  const selectDieForPlanning = (dieId: DieId) => {
+  const selectDieForPlanning = (dieId: DieId, force = false) => {
     playSound('select');
-    setSelectedDieId(dieId);
+    setSelectedDieId((current) => (!force && current === dieId ? null : dieId));
   };
   const showPanel = (panel: CollapsiblePanelId) => {
     playSound('panel');
@@ -1926,6 +1927,7 @@ export function App() {
     setGame(result.state);
     appendEvents(result.events, result.state);
     setSelectedDieId(null);
+    setActivePanel(null);
     setError(null);
   };
 
@@ -2659,7 +2661,7 @@ export function App() {
                             'application/x-shattered-die',
                             die.id,
                           );
-                          selectDieForPlanning(die.id);
+                          selectDieForPlanning(die.id, true);
                         }}
                         onDragEnd={() => setDraggingDieId(null)}
                         key={die.id}
@@ -2814,7 +2816,7 @@ export function App() {
                   <span>
                     {selectedDie
                       ? `${selectedDieRoutes.length} legal route${selectedDieRoutes.length === 1 ? '' : 's'} available`
-                      : 'Select a die to light up playable spaces.'}
+                      : 'Select a die, then choose a highlighted slot.'}
                   </span>
                 </div>
                 <div
@@ -3026,7 +3028,7 @@ export function App() {
             )}
             <CollapsiblePanel
               className="card-panel"
-              aria-label="Card hand and market"
+              ariaLabel="Card hand and market"
               contentId="cards-market-panel"
               dataTutorial="cards"
               open={activePanel === 'cards'}

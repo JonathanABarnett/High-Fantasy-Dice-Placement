@@ -606,8 +606,8 @@ export function BoardRenderer(props: BoardRendererProps) {
             : pinned
               ? 0xf1c66f
               : 0xd0a65d,
-          width: legal ? (recommended ? 3 : 1) : pinned ? 2 : 1,
-          alpha: isActive ? 0.42 : 0.2,
+          width: legal ? 1 : pinned ? 2 : 1,
+          alpha: legal ? 0 : isActive ? 0.42 : 0.2,
         });
       card.addChild(aura);
 
@@ -625,11 +625,11 @@ export function BoardRenderer(props: BoardRendererProps) {
                 ? 0x78efac
                 : 0x4e9b75
               : 0xc9a66a,
-          width: legal ? (recommended ? 4 : 1) : pinned ? 3 : 1,
+          width: legal ? 2 : pinned ? 3 : 1,
           alpha: recommended
-            ? 1
+            ? 0.24
             : legal
-              ? 0.52
+              ? 0
               : pinned
                 ? 0.95
                 : isActive
@@ -638,13 +638,6 @@ export function BoardRenderer(props: BoardRendererProps) {
         });
       if (legal && recommended) pulseTargets.push(highlight);
       card.addChild(highlight);
-      if (recommended) {
-        card.addChild(
-          new Graphics()
-            .ellipse(CARD_WIDTH / 2, CARD_HEIGHT / 2, 101, 84)
-            .stroke({ color: 0xffd36d, width: 5, alpha: 0.98 }),
-        );
-      }
       if (pinned) {
         card.addChild(
           new Graphics()
@@ -709,76 +702,24 @@ export function BoardRenderer(props: BoardRendererProps) {
         }
       }
 
-      if ((props.selectedDieId && isActive) || full) {
-        const badgeState = full
-          ? {
-              text: '● FULL',
-              fill: 0x423426,
-              stroke: 0xd9ad67,
-              textFill: 0xffe0ae,
-            }
-          : recommended
-            ? {
-                text: '★ BEST ROUTE',
-                fill: 0x6a3f10,
-                stroke: 0xffd36d,
-                textFill: 0xffedc7,
-              }
-            : legal
-              ? {
-                  text: '✓ PLAYABLE',
-                  fill: 0x174b32,
-                  stroke: 0x8bffc0,
-                  textFill: 0xcaffdf,
-                }
-              : {
-                  text: '× BLOCKED',
-                  fill: 0x431f1c,
-                  stroke: 0xd07868,
-                  textFill: 0xf0b1a6,
-                };
-        const badge = new Graphics()
-          .roundRect(139, 91, 88, 24, 12)
-          .fill({ color: badgeState.fill, alpha: 0.96 })
-          .stroke({
-            color: badgeState.stroke,
-            width: 2,
-            alpha: 1,
-          });
-        const badgeText = new Text({
-          text: badgeState.text,
-          style: {
-            fill: badgeState.textFill,
-            fontFamily: 'Arial',
-            fontSize: 11,
-            fontWeight: 'bold',
-          },
-        });
-        badgeText.anchor.set(0.5);
-        badgeText.position.set(183, 103);
-        card.addChild(badge, badgeText);
+      // Active destinations share one neutral landing rail. Legality belongs
+      // to the actual slot, not a large outline around the whole location.
+      // Sealed regions deliberately stay compact so the map art can breathe.
+      if (isActive) {
+        const placementRail = new Graphics()
+          .roundRect(34, 108, 182, 111, 13)
+          .fill({ color: 0x090b0b, alpha: 0.72 })
+          .stroke({ color: 0x8d7049, width: 1.5, alpha: 0.68 });
+        card.addChild(placementRail);
       }
-
-      // Every destination uses the same lower placement rail. Keeping the
-      // plaque, slots, and occupancy in one physical unit makes it obvious
-      // where a die will land, regardless of the illustration underneath.
-      const placementRail = new Graphics()
-        .roundRect(34, 108, 182, 111, 13)
-        .fill({ color: 0x090b0b, alpha: isActive ? 0.7 : 0.82 })
-        .stroke({
-          color: legal ? 0x78efac : isActive ? 0x8d7049 : 0x62605b,
-          width: legal ? 2 : 1.5,
-          alpha: legal ? 0.78 : 0.68,
-        });
-      card.addChild(placementRail);
 
       const plaque = new Graphics()
         .roundRect(41, 116, 168, 38, 10)
         .fill({ color: 0x130f0d, alpha: 0.88 })
         .stroke({
-          color: legal ? 0x78efac : 0xd0a65d,
-          width: legal ? 3 : 2,
-          alpha: legal ? 0.95 : 0.76,
+          color: recommended ? 0xffd36d : 0xd0a65d,
+          width: recommended ? 3 : 2,
+          alpha: recommended ? 0.95 : 0.76,
         });
       card.addChild(plaque);
 
@@ -811,21 +752,21 @@ export function BoardRenderer(props: BoardRendererProps) {
 
       if (!isActive) {
         const sealedRail = new Graphics()
-          .roundRect(55, SLOT_Y, 140, SLOT_SIZE, 8)
-          .fill({ color: 0x171819, alpha: 0.96 })
-          .stroke({ color: 0x77736b, width: 2, alpha: 0.9 });
+          .roundRect(84, SLOT_Y, 82, 24, 12)
+          .fill({ color: 0x171819, alpha: 0.9 })
+          .stroke({ color: 0x77736b, width: 1.5, alpha: 0.74 });
         const sealedRailText = new Text({
-          text: '⛓  SEALED THIS ROUND',
+          text: '⛓  SEALED',
           style: {
             fill: 0xc3beb4,
             fontFamily: 'Arial',
-            fontSize: 9,
+            fontSize: 8,
             fontWeight: 'bold',
             letterSpacing: 0.5,
           },
         });
         sealedRailText.anchor.set(0.5);
-        sealedRailText.position.set(CARD_WIDTH / 2, SLOT_CENTER_Y);
+        sealedRailText.position.set(CARD_WIDTH / 2, SLOT_Y + 12);
         card.addChild(sealedRail, sealedRailText);
       } else {
         location.slots.forEach((slot, slotIndex) => {
@@ -989,7 +930,7 @@ export function BoardRenderer(props: BoardRendererProps) {
                 color: props.selectedDieId
                   ? slotLegal
                     ? 0x123f2b
-                    : 0x331a17
+                    : 0x171719
                   : 0x171511,
                 alpha: props.selectedDieId ? 0.94 : 0.78,
               })
@@ -999,18 +940,18 @@ export function BoardRenderer(props: BoardRendererProps) {
                     ? 0xffd36d
                     : slotLegal
                       ? 0x78efac
-                      : 0xa85e50
+                      : 0x66635f
                   : 0x8a7352,
                 width: slotRecommended ? 5 : slotLegal ? 4 : 2,
                 alpha: 1,
               });
             const requirement = new Text({
-              text: `${props.selectedDieId ? (slotLegal ? '✓ ' : '× ') : ''}${requirementLabel(slot.requirement)}`,
+              text: `${props.selectedDieId && slotLegal ? '✓ ' : ''}${requirementLabel(slot.requirement)}`,
               style: {
                 fill: props.selectedDieId
                   ? slotLegal
                     ? 0xbaffd3
-                    : 0xd99588
+                    : 0xaaa59d
                   : 0xd6bd8f,
                 fontFamily: 'Arial',
                 fontSize: 9,
@@ -1041,15 +982,15 @@ export function BoardRenderer(props: BoardRendererProps) {
         });
       }
 
-      const occupancy = new Text({
-        text: isActive
-          ? `${occupied}/${openSlots.length} slots occupied`
-          : 'Returns in a later round',
-        style: { fill: 0xd6bd8f, fontFamily: 'Arial', fontSize: 10 },
-      });
-      occupancy.anchor.set(0.5);
-      occupancy.position.set(CARD_WIDTH / 2, 211);
-      card.addChild(occupancy);
+      if (isActive) {
+        const occupancy = new Text({
+          text: `${occupied}/${openSlots.length} slots occupied`,
+          style: { fill: 0xd6bd8f, fontFamily: 'Arial', fontSize: 10 },
+        });
+        occupancy.anchor.set(0.5);
+        occupancy.position.set(CARD_WIDTH / 2, 211);
+        card.addChild(occupancy);
+      }
       world.addChild(card);
       locationCardsRef.current.push(card);
     });
@@ -1379,11 +1320,7 @@ export function BoardRenderer(props: BoardRendererProps) {
                 : ''}{' '}
               {selectedDie.affinity} die selected
             </strong>
-            <span>{legalLocationCount} glowing locations can accept it</span>
-            <span className="placement-legend">
-              <i className="legend-legal">✓ Playable</i>
-              <i className="legend-blocked">× Blocked</i>
-            </span>
+            <span>{legalLocationCount} locations have a highlighted slot</span>
           </>
         ) : (
           <>
