@@ -2504,72 +2504,6 @@ export function App() {
                 selectedDieId={selectedDieId}
               />
             )}
-            {human && human.hand.length > 0 && (
-              <section
-                className="hand-dock"
-                aria-label="Your card hand"
-                data-tutorial="hand"
-              >
-                <div className="hand-dock-heading">
-                  <span className="eyebrow">Your hand</span>
-                  <strong>{human.hand.length}</strong>
-                </div>
-                <div className="hand-dock-cards">
-                  {human.hand.map((cardId, index) => {
-                    const card = game.cards.find((item) => item.id === cardId);
-                    if (!card) return null;
-                    const action: GameAction = {
-                      type: 'play-card',
-                      playerId: human.id,
-                      cardId,
-                      ...(card.target === 'ready-die' && selectedDieId
-                        ? { targetDieId: selectedDieId }
-                        : {}),
-                    };
-                    const legal = validateAction(game, action).legal;
-                    return (
-                      <article
-                        className={`hand-dock-card hand-dock-${card.category}`}
-                        data-card-id={card.id}
-                        key={`${cardId}-${index}`}
-                        style={cardArtStyle(card.category)}
-                      >
-                        <div className="hand-dock-art" aria-hidden="true" />
-                        <div>
-                          <span>
-                            <CategoryToken category={card.category} />
-                            <ResourceList values={card.cost} />
-                          </span>
-                          <strong>{card.name}</strong>
-                          <p>{card.rulesText}</p>
-                        </div>
-                        <button
-                          aria-label={`Play ${card.name}`}
-                          disabled={
-                            !legal || activePlayer?.controller !== 'human'
-                          }
-                          onClick={() => submitHumanAction(action)}
-                          type="button"
-                        >
-                          {card.target === 'ready-die'
-                            ? selectedDieId
-                              ? 'Cast on die'
-                              : 'Choose a die'
-                            : 'Play'}
-                        </button>
-                      </article>
-                    );
-                  })}
-                </div>
-                <button
-                  className="hand-dock-expand"
-                  onClick={() => showPanel('cards')}
-                  type="button"
-                >
-                  View all
-                </button>
-              </section>
-            )}
             <LocationDecisionDock
               game={game}
               human={human}
@@ -2775,6 +2709,74 @@ export function App() {
                 </div>
                 {human && <MomentumMeter player={human} />}
               </div>
+              {human && human.hand.length > 0 && (
+                <section
+                  className="hand-dock"
+                  aria-label="Your card hand"
+                  data-tutorial="hand"
+                >
+                  <div className="hand-dock-heading">
+                    <span className="eyebrow">Your hand</span>
+                    <strong>{human.hand.length}</strong>
+                  </div>
+                  <div className="hand-dock-cards">
+                    {human.hand.map((cardId, index) => {
+                      const card = game.cards.find(
+                        (item) => item.id === cardId,
+                      );
+                      if (!card) return null;
+                      const action: GameAction = {
+                        type: 'play-card',
+                        playerId: human.id,
+                        cardId,
+                        ...(card.target === 'ready-die' && selectedDieId
+                          ? { targetDieId: selectedDieId }
+                          : {}),
+                      };
+                      const legal = validateAction(game, action).legal;
+                      return (
+                        <article
+                          className={`hand-dock-card hand-dock-${card.category}`}
+                          data-card-id={card.id}
+                          key={`${cardId}-${index}`}
+                          style={cardArtStyle(card.category)}
+                        >
+                          <div className="hand-dock-art" aria-hidden="true" />
+                          <div>
+                            <span>
+                              <CategoryToken category={card.category} />
+                              <ResourceList values={card.cost} />
+                            </span>
+                            <strong>{card.name}</strong>
+                            <p>{card.rulesText}</p>
+                          </div>
+                          <button
+                            aria-label={`Play ${card.name}`}
+                            disabled={
+                              !legal || activePlayer?.controller !== 'human'
+                            }
+                            onClick={() => submitHumanAction(action)}
+                            type="button"
+                          >
+                            {card.target === 'ready-die'
+                              ? selectedDieId
+                                ? 'Cast on die'
+                                : 'Choose a die'
+                              : 'Play'}
+                          </button>
+                        </article>
+                      );
+                    })}
+                  </div>
+                  <button
+                    className="hand-dock-expand"
+                    onClick={() => showPanel('cards')}
+                    type="button"
+                  >
+                    View all
+                  </button>
+                </section>
+              )}
               {human && activePlayer?.controller === 'human' && (
                 <>
                   <MoveAdvisor

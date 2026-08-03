@@ -47,6 +47,48 @@ test('starts a deterministic human-versus-CPU match', async ({ page }) => {
   await expect(page.locator('.log-panel')).toContainText('entries');
 });
 
+test('reserves separate space for the board and command rail', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 2048, height: 1096 });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Start match' }).click();
+  await expect(page.getByTestId('pixi-board')).toHaveAttribute(
+    'data-ready',
+    'true',
+  );
+
+  const [header, players, board, tray, hand] = await Promise.all([
+    page.locator('.game-header').boundingBox(),
+    page.locator('.player-strip').boundingBox(),
+    page.locator('.board-stage').boundingBox(),
+    page.locator('.dice-panel').boundingBox(),
+    page.locator('.hand-dock').boundingBox(),
+  ]);
+
+  expect(header).not.toBeNull();
+  expect(players).not.toBeNull();
+  expect(board).not.toBeNull();
+  expect(tray).not.toBeNull();
+  expect(hand).not.toBeNull();
+
+  expect(header!.y + header!.height).toBeLessThanOrEqual(players!.y + 1);
+  expect(players!.y + players!.height).toBeLessThanOrEqual(board!.y + 1);
+  const verticalGeometry = JSON.stringify({ header, players, board, tray });
+  expect(board!.y + board!.height, verticalGeometry).toBeLessThanOrEqual(
+    tray!.y + 1,
+  );
+  const commandRailGeometry = JSON.stringify({ tray, hand });
+  expect(hand!.x, commandRailGeometry).toBeGreaterThanOrEqual(tray!.x);
+  expect(hand!.x + hand!.width, commandRailGeometry).toBeLessThanOrEqual(
+    tray!.x + tray!.width,
+  );
+  expect(hand!.y, commandRailGeometry).toBeGreaterThanOrEqual(tray!.y);
+  expect(hand!.y + hand!.height, commandRailGeometry).toBeLessThanOrEqual(
+    tray!.y + tray!.height,
+  );
+});
+
 test('keeps the realm full-width at the compact table breakpoint', async ({
   page,
 }) => {
@@ -66,6 +108,22 @@ test('keeps the realm playable while using the atlas and compact game menu', asy
 }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Start match' }).click();
+
+  const playerStripBox = await page.locator('.player-strip').boundingBox();
+  const atlasBox = await page.locator('.atlas-nav').boundingBox();
+  const compactBoardBox = await page.locator('.board-stage').boundingBox();
+  const compactTrayBox = await page.locator('.dice-panel').boundingBox();
+  expect(playerStripBox).not.toBeNull();
+  expect(atlasBox).not.toBeNull();
+  expect(
+    playerStripBox!.y + playerStripBox!.height,
+    JSON.stringify({
+      playerStripBox,
+      atlasBox,
+      compactBoardBox,
+      compactTrayBox,
+    }),
+  ).toBeLessThanOrEqual(atlasBox!.y);
 
   await page.getByRole('button', { name: 'Heartlands' }).click();
   await expect(
