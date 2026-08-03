@@ -2716,8 +2716,21 @@ export function App() {
                   data-tutorial="hand"
                 >
                   <div className="hand-dock-heading">
-                    <span className="eyebrow">Your hand</span>
-                    <strong>{human.hand.length}</strong>
+                    <div>
+                      <span className="eyebrow">Your hand</span>
+                      <strong>
+                        {human.hand.length}{' '}
+                        {human.hand.length === 1 ? 'card' : 'cards'}
+                      </strong>
+                    </div>
+                    <button
+                      aria-label="View full hand and card market"
+                      className="hand-dock-expand"
+                      onClick={() => showPanel('cards')}
+                      type="button"
+                    >
+                      Manage
+                    </button>
                   </div>
                   <div className="hand-dock-cards">
                     {human.hand.map((cardId, index) => {
@@ -2768,13 +2781,6 @@ export function App() {
                       );
                     })}
                   </div>
-                  <button
-                    className="hand-dock-expand"
-                    onClick={() => showPanel('cards')}
-                    type="button"
-                  >
-                    View all
-                  </button>
                 </section>
               )}
               {human && activePlayer?.controller === 'human' && (

@@ -58,19 +58,24 @@ test('reserves separate space for the board and command rail', async ({
     'true',
   );
 
-  const [header, players, board, tray, hand] = await Promise.all([
-    page.locator('.game-header').boundingBox(),
-    page.locator('.player-strip').boundingBox(),
-    page.locator('.board-stage').boundingBox(),
-    page.locator('.dice-panel').boundingBox(),
-    page.locator('.hand-dock').boundingBox(),
-  ]);
+  const [header, players, board, tray, hand, diceGroup, turnPlan] =
+    await Promise.all([
+      page.locator('.game-header').boundingBox(),
+      page.locator('.player-strip').boundingBox(),
+      page.locator('.board-stage').boundingBox(),
+      page.locator('.dice-panel').boundingBox(),
+      page.locator('.hand-dock').boundingBox(),
+      page.locator('.player-pieces').boundingBox(),
+      page.locator('.turn-summary').boundingBox(),
+    ]);
 
   expect(header).not.toBeNull();
   expect(players).not.toBeNull();
   expect(board).not.toBeNull();
   expect(tray).not.toBeNull();
   expect(hand).not.toBeNull();
+  expect(diceGroup).not.toBeNull();
+  expect(turnPlan).not.toBeNull();
 
   expect(header!.y + header!.height).toBeLessThanOrEqual(players!.y + 1);
   expect(players!.y + players!.height).toBeLessThanOrEqual(board!.y + 1);
@@ -85,6 +90,22 @@ test('reserves separate space for the board and command rail', async ({
   );
   expect(hand!.y, commandRailGeometry).toBeGreaterThanOrEqual(tray!.y);
   expect(hand!.y + hand!.height, commandRailGeometry).toBeLessThanOrEqual(
+    tray!.y + tray!.height,
+  );
+  expect(diceGroup!.x + diceGroup!.width).toBeLessThanOrEqual(hand!.x + 1);
+  expect(hand!.x + hand!.width).toBeLessThanOrEqual(turnPlan!.x + 1);
+
+  await page.locator('.die:not([disabled])').first().click();
+  await expect(page.locator('.hand-dock')).toBeHidden();
+  await expect(page.locator('.move-advisor')).toBeVisible();
+  const advisor = await page.locator('.move-advisor').boundingBox();
+  expect(advisor).not.toBeNull();
+  expect(advisor!.x).toBeGreaterThanOrEqual(tray!.x);
+  expect(advisor!.x + advisor!.width).toBeLessThanOrEqual(
+    tray!.x + tray!.width,
+  );
+  expect(advisor!.y).toBeGreaterThanOrEqual(tray!.y);
+  expect(advisor!.y + advisor!.height).toBeLessThanOrEqual(
     tray!.y + tray!.height,
   );
 });

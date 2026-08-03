@@ -644,22 +644,6 @@ export function BoardRenderer(props: BoardRendererProps) {
             .ellipse(CARD_WIDTH / 2, CARD_HEIGHT / 2, 101, 84)
             .stroke({ color: 0xffd36d, width: 5, alpha: 0.98 }),
         );
-        const bestBadge = new Graphics()
-          .roundRect(12, 44, 92, 25, 12)
-          .fill({ color: 0x6a3f10, alpha: 0.98 })
-          .stroke({ color: 0xffd36d, width: 2, alpha: 1 });
-        const bestText = new Text({
-          text: '★ BEST ROUTE',
-          style: {
-            fill: 0xffedc7,
-            fontFamily: 'Arial',
-            fontSize: 10,
-            fontWeight: 'bold',
-          },
-        });
-        bestText.anchor.set(0.5);
-        bestText.position.set(58, 56.5);
-        card.addChild(bestBadge, bestText);
       }
       if (pinned) {
         card.addChild(
@@ -725,20 +709,20 @@ export function BoardRenderer(props: BoardRendererProps) {
         }
       }
 
-      if (props.selectedDieId || !isActive || full) {
-        const badgeState = !isActive
+      if ((props.selectedDieId && isActive) || full) {
+        const badgeState = full
           ? {
-              text: '⛓ SEALED',
-              fill: 0x2b2b2b,
-              stroke: 0x818181,
-              textFill: 0xd0d0d0,
+              text: '● FULL',
+              fill: 0x423426,
+              stroke: 0xd9ad67,
+              textFill: 0xffe0ae,
             }
-          : full
+          : recommended
             ? {
-                text: '● FULL',
-                fill: 0x423426,
-                stroke: 0xd9ad67,
-                textFill: 0xffe0ae,
+                text: '★ BEST ROUTE',
+                fill: 0x6a3f10,
+                stroke: 0xffd36d,
+                textFill: 0xffedc7,
               }
             : legal
               ? {
@@ -754,7 +738,7 @@ export function BoardRenderer(props: BoardRendererProps) {
                   textFill: 0xf0b1a6,
                 };
         const badge = new Graphics()
-          .roundRect(149, 8, 78, 24, 12)
+          .roundRect(139, 91, 88, 24, 12)
           .fill({ color: badgeState.fill, alpha: 0.96 })
           .stroke({
             color: badgeState.stroke,
@@ -771,9 +755,22 @@ export function BoardRenderer(props: BoardRendererProps) {
           },
         });
         badgeText.anchor.set(0.5);
-        badgeText.position.set(188, 20);
+        badgeText.position.set(183, 103);
         card.addChild(badge, badgeText);
       }
+
+      // Every destination uses the same lower placement rail. Keeping the
+      // plaque, slots, and occupancy in one physical unit makes it obvious
+      // where a die will land, regardless of the illustration underneath.
+      const placementRail = new Graphics()
+        .roundRect(34, 108, 182, 111, 13)
+        .fill({ color: 0x090b0b, alpha: isActive ? 0.7 : 0.82 })
+        .stroke({
+          color: legal ? 0x78efac : isActive ? 0x8d7049 : 0x62605b,
+          width: legal ? 2 : 1.5,
+          alpha: legal ? 0.78 : 0.68,
+        });
+      card.addChild(placementRail);
 
       const plaque = new Graphics()
         .roundRect(41, 116, 168, 38, 10)
@@ -812,212 +809,242 @@ export function BoardRenderer(props: BoardRendererProps) {
       rewards.position.set(50, 138);
       card.addChild(rewards);
 
-      location.slots.forEach((slot, slotIndex) => {
-        const slotRowWidth = (location.slots.length - 1) * SLOT_GAP + SLOT_SIZE;
-        const x = (CARD_WIDTH - slotRowWidth) / 2 + slotIndex * SLOT_GAP;
-        const slotOpen = slot.isOpen !== false;
-        const slotLegal = slotOpen && legalSlotIds.has(slot.id);
-        const slotBumpable = bumpableSlotIds.has(slot.id);
-        const slotRecommended =
-          recommended && props.recommendedAction?.slotId === slot.id;
-        const die = new Graphics().roundRect(
-          x,
-          SLOT_Y,
-          SLOT_SIZE,
-          SLOT_SIZE,
-          7,
-        );
-        if (!slotOpen) {
-          die
-            .fill({ color: 0x0c0b0a, alpha: 0.9 })
-            .stroke({ color: 0x77736b, width: 2, alpha: 0.92 });
-          const sealed = new Text({
-            text: 'SEALED',
-            style: {
-              fill: 0xa9a39a,
-              fontFamily: 'Arial',
-              fontSize: 6.5,
-              fontWeight: 'bold',
-            },
-          });
-          sealed.anchor.set(0.5);
-          sealed.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y);
-          card.addChild(die, sealed);
-        } else if (slot.occupantDieId) {
-          const human = slot.occupantPlayerId === props.humanPlayerId;
-          const occupantPlayer = slot.occupantPlayerId
-            ? playerById.get(slot.occupantPlayerId)
-            : undefined;
-          const occupantDie = diceById.get(slot.occupantDieId);
-          const occupantValue = occupantDie
-            ? String(dieValue(occupantDie))
-            : '?';
-          const occupantRaidDamage =
-            location.encounter?.health !== undefined &&
-            occupantPlayer &&
-            occupantDie
-              ? raidDamageFor(occupantPlayer, occupantDie)
-              : null;
-          const landingRing = new Graphics()
-            .roundRect(x - 5, SLOT_Y - 5, SLOT_SIZE + 10, SLOT_SIZE + 10, 11)
-            .stroke({
-              color: slotBumpable ? 0xffd24a : human ? 0xa9ffd0 : 0xffb29f,
-              width: slotBumpable ? 3 : 2,
-              alpha: 0.58,
-            });
-          card.addChild(landingRing);
-          if (slotBumpable || occupantRaidDamage !== null) {
-            pulseTargets.push(landingRing);
-          }
-          die
-            .fill({ color: human ? 0x397f5a : 0x9a4b3f })
-            .stroke({
-              color: slotBumpable ? 0xffd24a : human ? 0xa9ffd0 : 0xffb29f,
-              width: slotBumpable ? 4 : 2,
-            })
-            .roundRect(x + 3, SLOT_Y + 3, SLOT_SIZE - 6, SLOT_SIZE - 6, 6)
-            .stroke({
-              color: human ? 0xd8ffe4 : 0xffd7cd,
-              width: 1,
-              alpha: 0.22,
-            });
-          if (occupantDie && dieValue(occupantDie) <= 6) {
-            drawDiePips(
-              die,
-              x,
-              SLOT_Y,
-              dieValue(occupantDie),
-              human ? 0xf2fff5 : 0xffede8,
-            );
-          }
-          const valueBadge = new Graphics()
-            .roundRect(x + SLOT_SIZE - 15, SLOT_Y - 5, 19, 15, 6)
-            .fill({ color: 0x120e0b, alpha: 0.92 })
-            .stroke({
-              color: slotBumpable ? 0xffd24a : human ? 0xa9ffd0 : 0xffb29f,
-              width: 1.5,
-              alpha: 0.95,
-            });
-          const valueBadgeText = new Text({
-            text: occupantValue,
-            style: {
-              fill: 0xfff0c8,
-              fontFamily: 'Arial',
-              fontSize: 9,
-              fontWeight: 'bold',
-            },
-          });
-          valueBadgeText.anchor.set(0.5);
-          valueBadgeText.position.set(x + SLOT_SIZE - 5.5, SLOT_Y + 2.5);
-          const pipFallbackValue = new Text({
-            text: occupantDie && dieValue(occupantDie) > 6 ? occupantValue : '',
-            style: {
-              fill: 0xffffff,
-              fontFamily: 'Georgia',
-              fontSize: 18,
-              fontWeight: 'bold',
-              stroke: { color: 0x120d0b, width: 3 },
-            },
-          });
-          pipFallbackValue.anchor.set(0.5);
-          pipFallbackValue.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y - 4);
-          const owner = new Text({
-            text:
-              occupantRaidDamage !== null
-                ? `${occupantRaidDamage} DMG`
-                : slotBumpable
-                  ? 'BUMP'
-                  : human
-                    ? 'YOU'
-                    : 'CPU',
-            style: {
-              fill: slotBumpable ? 0xffe89a : 0xf1eadc,
-              fontFamily: 'Arial',
-              fontSize: occupantRaidDamage !== null ? 6.5 : 7,
-              fontWeight: 'bold',
-              letterSpacing: 0.4,
-            },
-          });
-          owner.anchor.set(0.5);
-          owner.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y + 13);
-          card.addChild(
-            die,
-            pipFallbackValue,
-            valueBadge,
-            valueBadgeText,
-            owner,
+      if (!isActive) {
+        const sealedRail = new Graphics()
+          .roundRect(55, SLOT_Y, 140, SLOT_SIZE, 8)
+          .fill({ color: 0x171819, alpha: 0.96 })
+          .stroke({ color: 0x77736b, width: 2, alpha: 0.9 });
+        const sealedRailText = new Text({
+          text: '⛓  SEALED THIS ROUND',
+          style: {
+            fill: 0xc3beb4,
+            fontFamily: 'Arial',
+            fontSize: 9,
+            fontWeight: 'bold',
+            letterSpacing: 0.5,
+          },
+        });
+        sealedRailText.anchor.set(0.5);
+        sealedRailText.position.set(CARD_WIDTH / 2, SLOT_CENTER_Y);
+        card.addChild(sealedRail, sealedRailText);
+      } else {
+        location.slots.forEach((slot, slotIndex) => {
+          const slotRowWidth =
+            (location.slots.length - 1) * SLOT_GAP + SLOT_SIZE;
+          const x = (CARD_WIDTH - slotRowWidth) / 2 + slotIndex * SLOT_GAP;
+          const slotOpen = slot.isOpen !== false;
+          const slotLegal = slotOpen && legalSlotIds.has(slot.id);
+          const slotBumpable = bumpableSlotIds.has(slot.id);
+          const slotRecommended =
+            recommended && props.recommendedAction?.slotId === slot.id;
+          const die = new Graphics().roundRect(
+            x,
+            SLOT_Y,
+            SLOT_SIZE,
+            SLOT_SIZE,
+            7,
           );
-          if (slotBumpable) pulseTargets.push(die);
-        } else {
-          if (slotLegal) {
-            const targetRing = new Graphics()
-              .roundRect(x - 6, SLOT_Y - 6, SLOT_SIZE + 12, SLOT_SIZE + 12, 11)
-              .stroke({
-                color: slotRecommended ? 0xffd36d : 0x78efac,
-                width: slotRecommended ? 4 : 3,
-                alpha: 0.76,
-              });
-            card.addChild(targetRing);
-            pulseTargets.push(targetRing);
-          }
-          die
-            .fill({
-              color: props.selectedDieId
-                ? slotLegal
-                  ? 0x123f2b
-                  : 0x331a17
-                : 0x171511,
-              alpha: props.selectedDieId ? 0.94 : 0.78,
-            })
-            .stroke({
-              color: props.selectedDieId
-                ? slotRecommended
-                  ? 0xffd36d
-                  : slotLegal
-                    ? 0x78efac
-                    : 0xa85e50
-                : 0x8a7352,
-              width: slotRecommended ? 5 : slotLegal ? 4 : 2,
-              alpha: 1,
-            });
-          const requirement = new Text({
-            text: `${props.selectedDieId ? (slotLegal ? '✓ ' : '× ') : ''}${requirementLabel(slot.requirement)}`,
-            style: {
-              fill: props.selectedDieId
-                ? slotLegal
-                  ? 0xbaffd3
-                  : 0xd99588
-                : 0xd6bd8f,
-              fontFamily: 'Arial',
-              fontSize: 9,
-              fontWeight: 'bold',
-            },
-          });
-          requirement.anchor.set(0.5);
-          requirement.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y);
-          card.addChild(die, requirement);
-          if (slotLegal) {
-            const landCue = new Text({
-              text: slotRecommended ? 'LAND ★' : 'LAND',
+          if (!slotOpen) {
+            die
+              .fill({ color: 0x0c0b0a, alpha: 0.9 })
+              .stroke({ color: 0x77736b, width: 2, alpha: 0.92 });
+            const sealed = new Text({
+              text: 'SEALED',
               style: {
-                fill: slotRecommended ? 0xffedba : 0xbaffd3,
+                fill: 0xa9a39a,
                 fontFamily: 'Arial',
-                fontSize: 7,
+                fontSize: 6.5,
                 fontWeight: 'bold',
-                letterSpacing: 0.5,
-                stroke: { color: 0x120d0b, width: 2 },
               },
             });
-            landCue.anchor.set(0.5);
-            landCue.position.set(x + SLOT_SIZE / 2, SLOT_Y - 11);
-            card.addChild(landCue);
+            sealed.anchor.set(0.5);
+            sealed.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y);
+            card.addChild(die, sealed);
+          } else if (slot.occupantDieId) {
+            const human = slot.occupantPlayerId === props.humanPlayerId;
+            const occupantPlayer = slot.occupantPlayerId
+              ? playerById.get(slot.occupantPlayerId)
+              : undefined;
+            const occupantDie = diceById.get(slot.occupantDieId);
+            const occupantValue = occupantDie
+              ? String(dieValue(occupantDie))
+              : '?';
+            const occupantRaidDamage =
+              location.encounter?.health !== undefined &&
+              occupantPlayer &&
+              occupantDie
+                ? raidDamageFor(occupantPlayer, occupantDie)
+                : null;
+            const landingRing = new Graphics()
+              .roundRect(x - 5, SLOT_Y - 5, SLOT_SIZE + 10, SLOT_SIZE + 10, 11)
+              .stroke({
+                color: slotBumpable ? 0xffd24a : human ? 0xa9ffd0 : 0xffb29f,
+                width: slotBumpable ? 3 : 2,
+                alpha: 0.58,
+              });
+            card.addChild(landingRing);
+            if (slotBumpable || occupantRaidDamage !== null) {
+              pulseTargets.push(landingRing);
+            }
+            die
+              .fill({ color: human ? 0x397f5a : 0x9a4b3f })
+              .stroke({
+                color: slotBumpable ? 0xffd24a : human ? 0xa9ffd0 : 0xffb29f,
+                width: slotBumpable ? 4 : 2,
+              })
+              .roundRect(x + 3, SLOT_Y + 3, SLOT_SIZE - 6, SLOT_SIZE - 6, 6)
+              .stroke({
+                color: human ? 0xd8ffe4 : 0xffd7cd,
+                width: 1,
+                alpha: 0.22,
+              });
+            if (occupantDie && dieValue(occupantDie) <= 6) {
+              drawDiePips(
+                die,
+                x,
+                SLOT_Y,
+                dieValue(occupantDie),
+                human ? 0xf2fff5 : 0xffede8,
+              );
+            }
+            const valueBadge = new Graphics()
+              .roundRect(x + SLOT_SIZE - 15, SLOT_Y - 5, 19, 15, 6)
+              .fill({ color: 0x120e0b, alpha: 0.92 })
+              .stroke({
+                color: slotBumpable ? 0xffd24a : human ? 0xa9ffd0 : 0xffb29f,
+                width: 1.5,
+                alpha: 0.95,
+              });
+            const valueBadgeText = new Text({
+              text: occupantValue,
+              style: {
+                fill: 0xfff0c8,
+                fontFamily: 'Arial',
+                fontSize: 9,
+                fontWeight: 'bold',
+              },
+            });
+            valueBadgeText.anchor.set(0.5);
+            valueBadgeText.position.set(x + SLOT_SIZE - 5.5, SLOT_Y + 2.5);
+            const pipFallbackValue = new Text({
+              text:
+                occupantDie && dieValue(occupantDie) > 6 ? occupantValue : '',
+              style: {
+                fill: 0xffffff,
+                fontFamily: 'Georgia',
+                fontSize: 18,
+                fontWeight: 'bold',
+                stroke: { color: 0x120d0b, width: 3 },
+              },
+            });
+            pipFallbackValue.anchor.set(0.5);
+            pipFallbackValue.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y - 4);
+            const owner = new Text({
+              text:
+                occupantRaidDamage !== null
+                  ? `${occupantRaidDamage} DMG`
+                  : slotBumpable
+                    ? 'BUMP'
+                    : human
+                      ? 'YOU'
+                      : 'CPU',
+              style: {
+                fill: slotBumpable ? 0xffe89a : 0xf1eadc,
+                fontFamily: 'Arial',
+                fontSize: occupantRaidDamage !== null ? 6.5 : 7,
+                fontWeight: 'bold',
+                letterSpacing: 0.4,
+              },
+            });
+            owner.anchor.set(0.5);
+            owner.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y + 13);
+            card.addChild(
+              die,
+              pipFallbackValue,
+              valueBadge,
+              valueBadgeText,
+              owner,
+            );
+            if (slotBumpable) pulseTargets.push(die);
+          } else {
+            if (slotLegal) {
+              const targetRing = new Graphics()
+                .roundRect(
+                  x - 6,
+                  SLOT_Y - 6,
+                  SLOT_SIZE + 12,
+                  SLOT_SIZE + 12,
+                  11,
+                )
+                .stroke({
+                  color: slotRecommended ? 0xffd36d : 0x78efac,
+                  width: slotRecommended ? 4 : 3,
+                  alpha: 0.76,
+                });
+              card.addChild(targetRing);
+              pulseTargets.push(targetRing);
+            }
+            die
+              .fill({
+                color: props.selectedDieId
+                  ? slotLegal
+                    ? 0x123f2b
+                    : 0x331a17
+                  : 0x171511,
+                alpha: props.selectedDieId ? 0.94 : 0.78,
+              })
+              .stroke({
+                color: props.selectedDieId
+                  ? slotRecommended
+                    ? 0xffd36d
+                    : slotLegal
+                      ? 0x78efac
+                      : 0xa85e50
+                  : 0x8a7352,
+                width: slotRecommended ? 5 : slotLegal ? 4 : 2,
+                alpha: 1,
+              });
+            const requirement = new Text({
+              text: `${props.selectedDieId ? (slotLegal ? '✓ ' : '× ') : ''}${requirementLabel(slot.requirement)}`,
+              style: {
+                fill: props.selectedDieId
+                  ? slotLegal
+                    ? 0xbaffd3
+                    : 0xd99588
+                  : 0xd6bd8f,
+                fontFamily: 'Arial',
+                fontSize: 9,
+                fontWeight: 'bold',
+              },
+            });
+            requirement.anchor.set(0.5);
+            requirement.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y);
+            card.addChild(die, requirement);
+            if (slotLegal) {
+              const landCue = new Text({
+                text: slotRecommended ? 'LAND ★' : 'LAND',
+                style: {
+                  fill: slotRecommended ? 0xffedba : 0xbaffd3,
+                  fontFamily: 'Arial',
+                  fontSize: 7,
+                  fontWeight: 'bold',
+                  letterSpacing: 0.5,
+                  stroke: { color: 0x120d0b, width: 2 },
+                },
+              });
+              landCue.anchor.set(0.5);
+              landCue.position.set(x + SLOT_SIZE / 2, SLOT_Y - 11);
+              card.addChild(landCue);
+            }
           }
-        }
-        if (slotRecommended) pulseTargets.push(die);
-      });
+          if (slotRecommended) pulseTargets.push(die);
+        });
+      }
 
       const occupancy = new Text({
-        text: `${occupied}/${openSlots.length} slots`,
+        text: isActive
+          ? `${occupied}/${openSlots.length} slots occupied`
+          : 'Returns in a later round',
         style: { fill: 0xd6bd8f, fontFamily: 'Arial', fontSize: 10 },
       });
       occupancy.anchor.set(0.5);

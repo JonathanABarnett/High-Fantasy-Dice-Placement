@@ -77,8 +77,8 @@ const STEPS: readonly TutorialStep[] = [
     eyebrow: 'Schemes in reach',
     title: 'Play directly from your hand',
     symbol: '✦',
-    body: 'Your hand sits just above the tray as a row of physical cards. Hover to raise a card, play it directly, or open Cards for the larger hand-and-market drawer.',
-    tip: 'Some cards require a ready die as their target. Select that die before playing the card.',
+    body: 'Your hand occupies the center bay of the command rail. Play a visible card directly or choose Manage for the larger hand-and-market drawer. When you select a die, this same bay becomes a compact list of its best routes.',
+    tip: 'Some cards require a ready die as their target. Select that die before playing the card, then return to Cards when you are ready to cast it.',
   },
   {
     anchor: 'drawers',

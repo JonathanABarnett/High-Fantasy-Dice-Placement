@@ -6255,7 +6255,7 @@ select {
     bottom: auto;
     left: auto;
     grid-area: auto;
-    grid-template-columns: auto minmax(15rem, 1fr) minmax(19rem, 24rem);
+    grid-template-columns: auto minmax(20rem, 26rem) minmax(18rem, 1fr);
     justify-self: center;
     width: min(94rem, 100%);
     max-height: none;
@@ -6265,9 +6265,13 @@ select {
   .game-shell .hand-dock {
     position: relative;
     inset: auto;
-    grid-column: 3;
+    display: grid;
+    grid-column: 2;
     grid-row: 1;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 0.25rem;
     align-self: stretch;
+    align-items: stretch;
     width: 100%;
     max-width: none;
     min-width: 0;
@@ -6278,15 +6282,100 @@ select {
     flex: 1 1 auto;
     min-width: 0;
     max-width: none;
+    padding-top: 0;
   }
 
   .game-shell .hand-dock-card {
-    flex-basis: 11rem;
+    flex-basis: 10.25rem;
+    min-height: 4.5rem;
+  }
+
+  .game-shell .hand-dock-heading {
+    display: flex;
+    align-self: auto;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 0;
+    padding: 0.05rem 0.15rem 0.3rem;
+    border-right: 0;
+    border-bottom: 1px solid rgb(255 255 255 / 8%);
+    text-align: left;
+  }
+
+  .game-shell .hand-dock-heading > div {
+    display: flex;
+    gap: 0.45rem;
+    align-items: baseline;
+    min-width: 0;
+  }
+
+  .game-shell .hand-dock-heading .eyebrow {
+    font-size: 0.5rem;
+  }
+
+  .game-shell .hand-dock-heading strong {
+    font-family: inherit;
+    font-size: 0.68rem;
+  }
+
+  .game-shell .hand-dock-expand {
+    align-self: center;
+    width: auto;
+    min-height: 1.75rem;
+    padding: 0.22rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.52rem;
+  }
+
+  .game-shell .dice-panel:has(.turn-summary.is-armed) .hand-dock {
+    display: none;
+  }
+
+  .game-shell .dice-panel:has(.turn-summary.is-armed) .move-advisor,
+  .game-shell .dice-panel:has(.turn-summary.is-armed) .move-advisor.empty {
+    position: relative;
+    inset: auto;
+    z-index: 1;
+    grid-column: 2;
+    grid-row: 1;
+    align-self: stretch;
+    width: 100%;
+    max-height: none;
+    padding: 0.42rem;
+    overflow: hidden;
+    border-color: rgb(109 238 167 / 30%);
+    box-shadow: none;
+    transform: none;
+  }
+
+  .game-shell .move-advisor-head {
+    gap: 0.1rem;
+    padding-inline: 0.1rem;
+  }
+
+  .game-shell .move-advisor-head span {
+    font-size: 0.62rem;
+  }
+
+  .game-shell .move-list {
+    display: flex;
+    gap: 0.35rem;
+    min-width: 0;
+    overflow: auto hidden;
+  }
+
+  .game-shell .move-preview {
+    flex: 0 0 12rem;
+    min-height: 4.25rem;
   }
 
   .game-shell .player-pieces,
   .game-shell .turn-summary {
     grid-row: 1;
+  }
+
+  .game-shell .turn-summary {
+    grid-column: 3;
   }
 
   .game-shell .placement-guide {
@@ -6313,21 +6402,75 @@ select {
     grid-row: 2;
     min-height: 5.6rem;
   }
+
+  .game-shell .turn-summary {
+    grid-column: 2;
+  }
+
+  .game-shell .dice-panel:has(.turn-summary.is-armed) .move-advisor,
+  .game-shell .dice-panel:has(.turn-summary.is-armed) .move-advisor.empty {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
 }
 
 @media (max-width: 820px) {
   .game-shell .hand-dock {
     position: relative;
     inset: auto;
+    display: grid;
     grid-column: 1;
+    grid-template-rows: auto auto;
     width: 100%;
     max-width: none;
     transform: none;
+  }
+
+  .game-shell .hand-dock-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.2rem 0.3rem;
+    border-right: 0;
+    border-bottom: 1px solid rgb(255 255 255 / 8%);
+    text-align: left;
+  }
+
+  .game-shell .hand-dock-heading > div {
+    display: flex;
+    gap: 0.45rem;
+    align-items: baseline;
+  }
+
+  .game-shell .hand-dock-heading strong {
+    font-family: inherit;
+    font-size: 0.68rem;
+  }
+
+  .game-shell .hand-dock-expand {
+    width: auto;
+    min-height: 1.9rem;
+    padding: 0.25rem 0.55rem;
+    border-radius: 999px;
   }
 
   .game-shell .hand-dock-cards {
     flex: 1 1 auto;
     min-width: 0;
     max-width: none;
+  }
+
+  .game-shell .dice-panel:has(.turn-summary.is-armed) .hand-dock {
+    display: none;
+  }
+
+  .game-shell .dice-panel:has(.turn-summary.is-armed) .move-advisor,
+  .game-shell .dice-panel:has(.turn-summary.is-armed) .move-advisor.empty {
+    position: relative;
+    inset: auto;
+    grid-column: 1;
+    width: 100%;
+    max-height: none;
+    transform: none;
   }
 }
