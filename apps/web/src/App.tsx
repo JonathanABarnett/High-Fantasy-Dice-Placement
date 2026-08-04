@@ -87,6 +87,7 @@ const SAVE_KEY = 'shattered-crown.debug-match.v4';
 const TUTORIAL_KEY = 'shattered-crown.tutorial-complete.v2';
 const SOUND_KEY = 'shattered-crown.sound-enabled.v1';
 const SAVE_ENVELOPE_VERSION = 1;
+type MatchSeatCount = 2 | 3;
 const FACTION_PORTRAITS: Readonly<Record<string, string>> = {
   'arcanum-conclave': arcanumPortrait,
   'ember-dominion': emberPortrait,
@@ -274,6 +275,117 @@ interface Callout {
   readonly key?: number;
 }
 
+interface TurnCue {
+  readonly eyebrow: string;
+  readonly title: string;
+  readonly detail: string;
+  readonly tone: 'human' | 'rival' | 'round' | 'pass';
+  readonly key: number;
+}
+
+function nextTurnLabel(state: GameState): string {
+  const next = state.players.find(
+    (player) => player.id === state.turn.activePlayerId,
+  );
+  if (!next) return 'Final scoring';
+  return next.controller === 'human' ? 'Your turn' : `${next.name} to act`;
+}
+
+function turnCueFor(
+  events: readonly GameEvent[],
+  state: GameState,
+): TurnCue | null {
+  const round = events.find(
+    (event): event is Extract<GameEvent, { type: 'round-started' }> =>
+      event.type === 'round-started',
+  );
+  if (round) {
+    return {
+      eyebrow: `Round ${round.round} of ${state.round.maximum}`,
+      title: `Round ${round.round} begins`,
+      detail: `Dice returned and rerolled · ${nextTurnLabel(state)}`,
+      tone: 'round',
+      key: state.eventSequence,
+    };
+  }
+
+  const placement = events.find(
+    (event): event is Extract<GameEvent, { type: 'die-placed' }> =>
+      event.type === 'die-placed',
+  );
+  if (placement) {
+    const actor = state.players.find(
+      (player) => player.id === placement.playerId,
+    );
+    const location = state.locations.find(
+      (item) => item.id === placement.locationId,
+    );
+    const gains = events.flatMap((event) => {
+      if (
+        event.type === 'resource-gained' &&
+        event.playerId === placement.playerId
+      ) {
+        return [`+${event.amount} ${RESOURCE_INFO[event.resource].label}`];
+      }
+      if (
+        event.type === 'victory-points-gained' &&
+        event.playerId === placement.playerId
+      ) {
+        return [`+${event.amount}★`];
+      }
+      return [];
+    });
+    return {
+      eyebrow:
+        actor?.controller === 'human'
+          ? 'Move committed'
+          : `${actor?.name} moved`,
+      title: location?.name ?? 'Location claimed',
+      detail: `${gains.join(' · ') || 'Board position claimed'} · ${nextTurnLabel(state)}`,
+      tone: actor?.controller === 'human' ? 'human' : 'rival',
+      key: state.eventSequence,
+    };
+  }
+
+  const passed = events.find(
+    (event): event is Extract<GameEvent, { type: 'player-passed' }> =>
+      event.type === 'player-passed',
+  );
+  if (passed) {
+    const actor = state.players.find((player) => player.id === passed.playerId);
+    return {
+      eyebrow: 'Round tempo',
+      title: `${actor?.controller === 'human' ? 'You pass' : `${actor?.name} passes`}`,
+      detail: nextTurnLabel(state),
+      tone: 'pass',
+      key: state.eventSequence,
+    };
+  }
+
+  const cardEvent = events.find(
+    (
+      event,
+    ): event is Extract<GameEvent, { type: 'card-played' | 'card-acquired' }> =>
+      event.type === 'card-played' || event.type === 'card-acquired',
+  );
+  if (cardEvent) {
+    const actor = state.players.find(
+      (player) => player.id === cardEvent.playerId,
+    );
+    const card = state.cards.find((item) => item.id === cardEvent.cardId);
+    return {
+      eyebrow:
+        cardEvent.type === 'card-played' ? 'Scheme resolved' : 'Card acquired',
+      title: card?.name ?? 'Royal scheme',
+      detail: nextTurnLabel(state),
+      tone: actor?.controller === 'human' ? 'human' : 'rival',
+      key: state.eventSequence,
+    };
+  }
+
+  return null;
+}
+
 /**
  * Picks the one event in a batch worth interrupting the player for. Without
  * this, a killing blow and a resource tick read identically — a line of text in
@@ -373,6 +485,32 @@ function CalloutBanner({
   );
 }
 
+function TurnCueBanner({
+  cue,
+  reducedMotion,
+  onDone,
+}: {
+  readonly cue: TurnCue;
+  readonly reducedMotion: boolean;
+  readonly onDone: () => void;
+}) {
+  useEffect(() => {
+    const timer = window.setTimeout(onDone, 1650);
+    return () => window.clearTimeout(timer);
+  }, [cue.key, onDone]);
+  return (
+    <div
+      className={`turn-cue tone-${cue.tone} ${reducedMotion ? 'still' : ''}`}
+      key={cue.key}
+      role="status"
+    >
+      <span>{cue.eyebrow}</span>
+      <strong>{cue.title}</strong>
+      <em>{cue.detail}</em>
+    </div>
+  );
+}
+
 function totalScore(state: GameState, player: PlayerState): number {
   return (state.result?.scores[player.id] ?? []).reduce(
     (total, item) => total + item.points,
@@ -404,6 +542,7 @@ interface MovePreview {
   readonly bump: boolean;
   readonly headline: string;
   readonly stakes: readonly string[];
+  readonly actorName: string;
 }
 
 function addPreviewResource(
@@ -577,6 +716,7 @@ function previewMove(
     bump,
     headline,
     stakes,
+    actorName: player.name,
   };
 }
 
@@ -665,7 +805,7 @@ function RivalThreats({
       <section className="rival-threats calm" aria-label="Rival threats">
         <strong>Rival pressure</strong>
         <span>
-          The CPU has no obvious placement route if the board froze here.
+          Your rivals have no obvious placement route if the board froze here.
         </span>
       </section>
     );
@@ -675,7 +815,7 @@ function RivalThreats({
   return (
     <section className="rival-threats" aria-label="Rival threats">
       <div className="rival-threats-head">
-        <strong>CPU wants next</strong>
+        <strong>{primary.actorName} wants next</strong>
         <span>If you leave the board open.</span>
       </div>
       <button
@@ -911,6 +1051,19 @@ function throwRewardToPlayer(
   );
 }
 
+function throwVictoryToPlayer(
+  locationId: LocationId,
+  playerId: PlayerId,
+  amount: number,
+): void {
+  throwPiece(
+    `[data-testid="location-hotspot-${locationId}"]`,
+    `[data-player-id="${playerId}"] .player-score`,
+    `+${amount} ★`,
+    'reward-flight reward-victory',
+  );
+}
+
 function pulseElement(selector: string, className: string, duration = 720) {
   const target = document.querySelector<HTMLElement>(selector);
   if (!target) return;
@@ -1033,20 +1186,26 @@ function cueForEvents(events: readonly GameEvent[]): GameSoundCue {
   return 'resource';
 }
 
+interface GameAudioGraph {
+  readonly context: AudioContext;
+  readonly master: GainNode;
+  readonly noise: AudioBuffer;
+}
+
 /**
- * A tiny procedural score for moment-to-moment feedback. It deliberately uses
- * Web Audio rather than bundled files, so the game gains tactile sound now and
- * every cue can later be swapped for a licensed sample without changing the
- * engine or action flow.
+ * A restrained procedural tabletop mix. Short filtered-noise impacts provide
+ * the physical clack and scrape; soft pitched layers communicate value without
+ * turning every click into an arcade bleep. The master compressor keeps rapid
+ * CPU turns and multi-reward batches from stacking into a harsh peak.
  */
 function useGameAudio(enabled: boolean) {
-  const contextRef = useRef<AudioContext | null>(null);
+  const graphRef = useRef<GameAudioGraph | null>(null);
 
   useEffect(
     () => () => {
-      const context = contextRef.current;
-      contextRef.current = null;
-      if (context && context.state !== 'closed') void context.close();
+      const graph = graphRef.current;
+      graphRef.current = null;
+      if (graph && graph.context.state !== 'closed') void graph.context.close();
     },
     [],
   );
@@ -1062,9 +1221,33 @@ function useGameAudio(enabled: boolean) {
           }
         ).webkitAudioContext;
       if (!AudioContextConstructor) return;
-      const context =
-        contextRef.current ??
-        (contextRef.current = new AudioContextConstructor());
+      let graph = graphRef.current;
+      if (!graph) {
+        const context = new AudioContextConstructor();
+        const master = context.createGain();
+        const compressor = context.createDynamicsCompressor();
+        master.gain.value = 0.72;
+        compressor.threshold.value = -24;
+        compressor.knee.value = 18;
+        compressor.ratio.value = 5;
+        compressor.attack.value = 0.004;
+        compressor.release.value = 0.16;
+        master.connect(compressor).connect(context.destination);
+
+        const noise = context.createBuffer(
+          1,
+          Math.ceil(context.sampleRate * 0.65),
+          context.sampleRate,
+        );
+        const channel = noise.getChannelData(0);
+        for (let index = 0; index < channel.length; index += 1) {
+          const envelope = 1 - index / channel.length;
+          channel[index] = (Math.random() * 2 - 1) * envelope;
+        }
+        graph = { context, master, noise };
+        graphRef.current = graph;
+      }
+      const { context, master, noise: noiseBuffer } = graph;
 
       const score = () => {
         const now = context.currentTime;
@@ -1073,7 +1256,7 @@ function useGameAudio(enabled: boolean) {
           duration: number,
           delay = 0,
           type: OscillatorType = 'sine',
-          volume = 0.028,
+          volume = 0.022,
           endFrequency?: number,
         ) => {
           const oscillator = context.createOscillator();
@@ -1089,55 +1272,108 @@ function useGameAudio(enabled: boolean) {
             );
           }
           gain.gain.setValueAtTime(0.0001, start);
-          gain.gain.exponentialRampToValueAtTime(volume, start + 0.012);
+          gain.gain.exponentialRampToValueAtTime(
+            volume,
+            start + Math.min(0.014, duration * 0.22),
+          );
           gain.gain.exponentialRampToValueAtTime(0.0001, end);
-          oscillator.connect(gain).connect(context.destination);
+          oscillator.connect(gain).connect(master);
           oscillator.start(start);
           oscillator.stop(end + 0.02);
         };
 
+        const texture = (
+          duration: number,
+          delay: number,
+          volume: number,
+          cutoff: number,
+          type: BiquadFilterType = 'lowpass',
+          playbackRate = 1,
+        ) => {
+          const source = context.createBufferSource();
+          const filter = context.createBiquadFilter();
+          const gain = context.createGain();
+          const start = now + delay;
+          const end = start + duration;
+          source.buffer = noiseBuffer;
+          source.playbackRate.value = playbackRate;
+          filter.type = type;
+          filter.frequency.value = cutoff;
+          filter.Q.value = type === 'bandpass' ? 1.8 : 0.7;
+          gain.gain.setValueAtTime(0.0001, start);
+          gain.gain.exponentialRampToValueAtTime(volume, start + 0.006);
+          gain.gain.exponentialRampToValueAtTime(0.0001, end);
+          source.connect(filter).connect(gain).connect(master);
+          source.start(start, Math.random() * 0.12, duration);
+          source.stop(end + 0.015);
+        };
+
+        const woodenImpact = (delay: number, weight = 1, pitch = 105) => {
+          texture(0.065, delay, 0.032 * weight, 820, 'lowpass', 0.92);
+          tone(pitch, 0.09, delay, 'sine', 0.026 * weight, pitch * 0.56);
+        };
+
         if (cue === 'dice') {
-          [240, 310, 270, 360, 420].forEach((frequency, index) =>
-            tone(frequency, 0.055, index * 0.055, 'square', 0.014),
-          );
-          tone(120, 0.19, 0.28, 'sine', 0.035, 70);
+          [0, 0.054, 0.11, 0.174, 0.248].forEach((delay, index) => {
+            texture(
+              0.045,
+              delay,
+              0.026 - index * 0.002,
+              1050 + index * 130,
+              'bandpass',
+              0.88 + index * 0.045,
+            );
+            tone(150 + index * 17, 0.055, delay, 'sine', 0.012, 92 + index * 5);
+          });
+          woodenImpact(0.29, 1.15, 92);
         } else if (cue === 'place') {
-          tone(105, 0.2, 0, 'sine', 0.042, 48);
-          tone(460, 0.14, 0.055, 'triangle', 0.018, 620);
+          woodenImpact(0, 1.3, 88);
+          texture(0.09, 0.025, 0.022, 1250, 'bandpass', 0.84);
+          tone(330, 0.13, 0.05, 'sine', 0.012, 410);
         } else if (cue === 'select') {
-          tone(520, 0.075, 0, 'triangle', 0.018, 680);
+          texture(0.032, 0, 0.012, 1450, 'bandpass', 1.18);
+          tone(610, 0.055, 0, 'sine', 0.012, 720);
         } else if (cue === 'panel') {
-          tone(330, 0.08, 0, 'triangle', 0.012, 410);
+          texture(0.075, 0, 0.013, 980, 'bandpass', 0.78);
+          tone(285, 0.075, 0.012, 'sine', 0.009, 360);
         } else if (cue === 'card') {
-          [440, 660, 880].forEach((frequency, index) =>
-            tone(frequency, 0.18, index * 0.045, 'triangle', 0.022),
-          );
+          texture(0.16, 0, 0.022, 2100, 'bandpass', 1.08);
+          texture(0.12, 0.07, 0.014, 2900, 'highpass', 1.22);
+          tone(392, 0.2, 0.055, 'sine', 0.014, 523);
         } else if (cue === 'acquire' || cue === 'resource') {
-          tone(760, 0.11, 0, 'sine', 0.024);
-          tone(cue === 'acquire' ? 1180 : 960, 0.18, 0.07, 'sine', 0.025);
+          woodenImpact(0, 0.55, 135);
+          tone(620, 0.13, 0.025, 'sine', 0.012);
+          tone(cue === 'acquire' ? 930 : 790, 0.2, 0.09, 'sine', 0.015);
         } else if (cue === 'combat') {
-          tone(125, 0.28, 0, 'sawtooth', 0.044, 42);
-          tone(58, 0.32, 0.025, 'square', 0.026, 34);
+          texture(0.18, 0, 0.052, 540, 'lowpass', 0.68);
+          tone(92, 0.31, 0, 'sine', 0.052, 38);
+          texture(0.11, 0.035, 0.021, 2200, 'bandpass', 0.82);
         } else if (cue === 'bump') {
-          tone(170, 0.16, 0, 'sawtooth', 0.036, 68);
-          tone(540, 0.09, 0.1, 'square', 0.017, 340);
+          woodenImpact(0, 1.15, 100);
+          texture(0.11, 0.045, 0.032, 1450, 'bandpass', 1.26);
+          woodenImpact(0.12, 0.72, 132);
         } else if (cue === 'forge') {
-          tone(170, 0.1, 0, 'square', 0.025, 120);
-          tone(240, 0.11, 0.105, 'square', 0.025, 160);
-          tone(740, 0.28, 0.2, 'triangle', 0.025);
+          [0, 0.105].forEach((delay, index) => {
+            texture(0.07, delay, 0.03, 1800 + index * 520, 'bandpass', 1.3);
+            tone(176 + index * 48, 0.1, delay, 'sine', 0.021, 118);
+          });
+          tone(698, 0.32, 0.19, 'sine', 0.018, 784);
         } else if (cue === 'quest' || cue === 'victory') {
           const notes =
             cue === 'victory' ? [392, 523, 659, 784] : [392, 523, 659];
           notes.forEach((frequency, index) =>
-            tone(frequency, 0.42, index * 0.09, 'triangle', 0.026),
+            tone(frequency, 0.42, index * 0.1, 'sine', 0.018),
           );
+          texture(0.28, 0.06, 0.011, 3600, 'highpass', 1.12);
         } else if (cue === 'turn') {
-          tone(520, 0.2, 0, 'sine', 0.018);
-          tone(780, 0.28, 0.09, 'sine', 0.022);
+          tone(392, 0.2, 0, 'sine', 0.012);
+          tone(587, 0.27, 0.11, 'sine', 0.016);
         } else if (cue === 'pass') {
-          tone(300, 0.2, 0, 'triangle', 0.02, 180);
+          texture(0.11, 0, 0.014, 760, 'bandpass', 0.72);
+          tone(270, 0.2, 0, 'sine', 0.014, 175);
         } else {
-          tone(145, 0.2, 0, 'square', 0.022, 92);
+          woodenImpact(0, 0.75, 112);
+          tone(190, 0.16, 0.02, 'sine', 0.012, 128);
         }
       };
 
@@ -1607,6 +1843,7 @@ export function App() {
   // demonstrable on a first run.
   const [seed, setSeed] = useState('shattered-crown-008');
   const [difficulty, setDifficulty] = useState<CpuDifficulty>('knight');
+  const [seatCount, setSeatCount] = useState<MatchSeatCount>(2);
   const [game, setGame] = useState<GameState | null>(null);
   const [selectedDieId, setSelectedDieId] = useState<DieId | null>(null);
   const [draggingDieId, setDraggingDieId] = useState<DieId | null>(null);
@@ -1614,6 +1851,7 @@ export function App() {
   const [upgradeFaceIndex, setUpgradeFaceIndex] = useState(0);
   const [log, setLog] = useState<readonly string[]>([]);
   const [callout, setCallout] = useState<Callout | null>(null);
+  const [turnCue, setTurnCue] = useState<TurnCue | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hoveredLocationId, setHoveredLocationId] = useState<LocationId | null>(
     null,
@@ -1639,7 +1877,10 @@ export function App() {
   );
 
   const human = game?.players.find((player) => player.controller === 'human');
-  const cpu = game?.players.find((player) => player.controller === 'cpu');
+  const cpuPlayers = useMemo(
+    () => game?.players.filter((player) => player.controller === 'cpu') ?? [],
+    [game],
+  );
   const activePlayer = game?.players.find(
     (player) => player.id === game.turn.activePlayerId,
   );
@@ -1708,23 +1949,34 @@ export function App() {
       .sort((left, right) => right.score - left.score);
   }, [activePlayer?.controller, game, human, legalActions, selectedDieId]);
   const rivalPreviews = useMemo(() => {
-    if (!game || !cpu || activePlayer?.controller !== 'human') return [];
-    const hypothetical: GameState = {
-      ...game,
-      turn: { ...game.turn, activePlayerId: cpu.id },
-    };
-    return enumerateLegalActions(hypothetical)
-      .filter(
-        (
-          action,
-        ): action is Extract<GameAction, { type: 'place-die' | 'bump-die' }> =>
-          (action.type === 'place-die' || action.type === 'bump-die') &&
-          action.playerId === cpu.id,
-      )
-      .map((action) => previewMove(hypothetical, cpu, action))
+    if (
+      !game ||
+      cpuPlayers.length === 0 ||
+      activePlayer?.controller !== 'human'
+    )
+      return [];
+    return cpuPlayers
+      .flatMap((cpuPlayer) => {
+        const hypothetical: GameState = {
+          ...game,
+          turn: { ...game.turn, activePlayerId: cpuPlayer.id },
+        };
+        return enumerateLegalActions(hypothetical)
+          .filter(
+            (
+              action,
+            ): action is Extract<
+              GameAction,
+              { type: 'place-die' | 'bump-die' }
+            > =>
+              (action.type === 'place-die' || action.type === 'bump-die') &&
+              action.playerId === cpuPlayer.id,
+          )
+          .map((action) => previewMove(hypothetical, cpuPlayer, action));
+      })
       .filter((preview): preview is MovePreview => preview !== null)
       .sort((left, right) => right.score - left.score);
-  }, [activePlayer?.controller, cpu, game]);
+  }, [activePlayer?.controller, cpuPlayers, game]);
   const hoverLocation = (locationId: LocationId | null) => {
     setHoveredLocationId(locationId);
   };
@@ -1807,7 +2059,13 @@ export function App() {
         .map((event) => calloutFor(event, nextState))
         .filter((item): item is Callout => item !== null)
         .sort((left, right) => right.weight - left.weight)[0];
-      if (headline) setCallout({ ...headline, key: nextState.eventSequence });
+      const cue = turnCueFor(events, nextState);
+      if (headline) {
+        setCallout({ ...headline, key: nextState.eventSequence });
+        setTurnCue(null);
+      } else if (cue) {
+        setTurnCue(cue);
+      }
     },
     [playSound],
   );
@@ -1853,6 +2111,16 @@ export function App() {
                   event.amount,
                 );
               }
+              if (
+                event.type === 'victory-points-gained' &&
+                event.playerId === placement.playerId
+              ) {
+                throwVictoryToPlayer(
+                  placement.locationId,
+                  event.playerId,
+                  event.amount,
+                );
+              }
             }
           },
           Math.round(FLIGHT_MS * 0.55),
@@ -1895,13 +2163,18 @@ export function App() {
     );
     const cpuFaction =
       factions[(selectedIndex + 1) % factions.length] ?? factions[1];
+    const secondCpuFaction =
+      factions[(selectedIndex + 2) % factions.length] ?? factions[2];
     const created = createGame({
       seed: seed.trim() || 'shattered-crown-001',
       humanFactionId: selectedFaction,
       cpuFactionId: cpuFaction.id,
+      additionalCpuFactionIds:
+        seatCount === 3 && secondCpuFaction ? [secondCpuFaction.id] : undefined,
       content: { factions, locations, cards, upgrades, objectives },
     });
     setGame(created.state);
+    setTurnCue(turnCueFor(created.events, created.state));
     playSound('dice');
     setSelectedDieId(null);
     setUpgradeDieId(created.state.players[0]?.dice[0]?.id ?? null);
@@ -1999,13 +2272,16 @@ export function App() {
       return;
     const matchId = game.id;
     const turnNumber = game.turn.turnNumber;
-    const timer = window.setTimeout(() => {
-      if (game.id !== matchId || game.turn.turnNumber !== turnNumber) return;
-      const result = applyAction(game, chooseCpuAction(game, difficulty));
-      launchActionFeedback(game, result.events);
-      setGame(result.state);
-      appendEvents(result.events, result.state);
-    }, 220);
+    const timer = window.setTimeout(
+      () => {
+        if (game.id !== matchId || game.turn.turnNumber !== turnNumber) return;
+        const result = applyAction(game, chooseCpuAction(game, difficulty));
+        launchActionFeedback(game, result.events);
+        setGame(result.state);
+        appendEvents(result.events, result.state);
+      },
+      reducedMotion ? 220 : FLIGHT_MS + 100,
+    );
     return () => window.clearTimeout(timer);
   }, [
     activePlayer?.controller,
@@ -2013,6 +2289,7 @@ export function App() {
     difficulty,
     game,
     launchActionFeedback,
+    reducedMotion,
   ]);
 
   const saveMatch = () => {
@@ -2065,7 +2342,7 @@ export function App() {
       <main className="setup-shell" style={panelArtStyle(titleHeroArt)}>
         <section className="setup-card">
           <header className="setup-intro">
-            <p className="eyebrow">A high-fantasy dice-placement duel</p>
+            <p className="eyebrow">A high-fantasy dice-placement contest</p>
             <h1>Realms of the Shattered Crown</h1>
             <p className="lede">
               Roll your house dice. Claim the realm. Build an engine worthy of
@@ -2076,7 +2353,7 @@ export function App() {
                 <strong>6</strong> rounds
               </span>
               <span>
-                <strong>5</strong> dice
+                <strong>{seatCount}</strong> houses
               </span>
               <span>
                 <strong>1</strong> crown
@@ -2125,7 +2402,20 @@ export function App() {
 
             <div className="setup-options">
               <label>
-                Opponent
+                Players
+                <select
+                  aria-label="Players"
+                  value={seatCount}
+                  onChange={(event) =>
+                    setSeatCount(Number(event.target.value) as MatchSeatCount)
+                  }
+                >
+                  <option value={2}>You + 1 CPU</option>
+                  <option value={3}>You + 2 CPUs</option>
+                </select>
+              </label>
+              <label>
+                CPU difficulty
                 <select
                   value={difficulty}
                   onChange={(event) =>
@@ -2289,7 +2579,10 @@ export function App() {
         </div>
       </header>
 
-      <section className="player-strip" data-tutorial="players">
+      <section
+        className={`player-strip player-strip-${game.players.length}`}
+        data-tutorial="players"
+      >
         {game.players.map((player) => (
           <article
             className={
@@ -2454,7 +2747,7 @@ export function App() {
           <h2>
             {game.result?.winnerIds.includes(human?.id as never)
               ? 'The realm crowns you'
-              : 'The CPU claims the crown'}
+              : 'A rival claims the crown'}
           </h2>
           <div className="score-grid">
             {game.players.map((player) => (
@@ -2486,6 +2779,13 @@ export function App() {
             aria-label="Fantasy board"
             data-tutorial="board"
           >
+            {turnCue && !callout && (
+              <TurnCueBanner
+                cue={turnCue}
+                onDone={() => setTurnCue(null)}
+                reducedMotion={reducedMotion}
+              />
+            )}
             {callout && (
               <CalloutBanner
                 callout={callout}
@@ -2821,7 +3121,7 @@ export function App() {
                       ? `Value ${dieValue(selectedDie)} ${AFFINITY_INFO[selectedDie.affinity].label}`
                       : activePlayer?.controller === 'human'
                         ? 'Choose a die or card'
-                        : 'CPU is planning'}
+                        : `${activePlayer?.name ?? 'CPU'} is planning`}
                   </strong>
                   <span>
                     {selectedDie

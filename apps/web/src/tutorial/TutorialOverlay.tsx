@@ -21,7 +21,7 @@ const STEPS: readonly TutorialStep[] = [
     eyebrow: 'The match begins',
     title: 'Claim the Shattered Crown',
     symbol: '♛',
-    body: 'You and the CPU have six rounds to build the stronger realm. The compact header keeps the current round, active player, camera controls, and menu visible without shrinking the board.',
+    body: 'You and your CPU rivals have six rounds to build the strongest realm. The compact header keeps the current round, active player, camera controls, and menu visible without shrinking the board. A brief action ribbon summarizes each handoff without stopping play.',
     tip: 'Most actions spend your turn. Read who acts next before committing a die or card.',
   },
   {
@@ -29,7 +29,7 @@ const STEPS: readonly TutorialStep[] = [
     eyebrow: 'The score race',
     title: 'Track score and resources',
     symbol: '◈',
-    body: 'The two house strips show the live total score and each player’s resources. The large number answers who is winning; the smaller icons show what each player can afford right now.',
+    body: 'The house strips show the live total score and each player’s resources. The large number answers who is winning; the smaller icons show what each player can afford right now.',
     tip: 'The displayed total already includes every scoring source the game can currently calculate.',
   },
   {
@@ -53,7 +53,7 @@ const STEPS: readonly TutorialStep[] = [
     eyebrow: 'Read the realm',
     title: 'Follow the highlighted slots',
     symbol: '⌖',
-    body: 'The realm is always the main play surface. After choosing a die, only legal landing slots glow green; unavailable slots stay quiet. Click a highlighted location or drag the die directly onto its slot to commit.',
+    body: 'The realm is always the main play surface. At rest, slot rails stay muted so the painted map can breathe; hover or keyboard-focus a location to bring its details forward. After choosing a die, only legal landing slots glow green while unavailable slots recede.',
     tip: 'Use the Atlas pills to jump between regions and the mouse wheel to zoom without leaving the table.',
   },
   {
@@ -101,7 +101,7 @@ const STEPS: readonly TutorialStep[] = [
     eyebrow: 'The great wyrm',
     title: 'Wound the Elder Dragon together',
     symbol: '🜂',
-    body: 'Dragon Pass is a raid. The dragon keeps one pool of health across every round, and both players wound the same pool — a critical hit bites twice as deep.',
+    body: 'Dragon Pass is a raid. The dragon keeps one pool of health across every round, and every player wounds the same pool — a critical hit bites twice as deep.',
     tip: 'The hoard grows each round the dragon survives, but if nobody wounds it that round, it regenerates. Only the killing blow claims the bounty.',
   },
   {
@@ -125,7 +125,7 @@ const STEPS: readonly TutorialStep[] = [
     eyebrow: 'Race the realm',
     title: 'Claim the Crown Quests first',
     symbol: '★',
-    body: 'Three shared quests are drawn each match and both players chase the same three. Quests can care about monsters, resources, upgrades, placements, cards played, or even ally and relic cards specifically.',
+    body: 'Three shared quests are drawn each match and every player chases the same three. Quests can care about monsters, resources, upgrades, placements, cards played, or even ally and relic cards specifically.',
     tip: 'The moment someone meets a quest, its points are theirs forever. Check this drawer early, choose a race, then return to the board.',
   },
   {
@@ -133,8 +133,8 @@ const STEPS: readonly TutorialStep[] = [
     eyebrow: 'Round tempo',
     title: 'Pass when your plans are complete',
     symbol: '⌛',
-    body: 'Passing removes you from the rest of the current round. When both players pass, all dice return, reroll, and the next round begins.',
-    tip: 'You cannot act again after passing, even if the CPU keeps playing.',
+    body: 'Passing removes you from the rest of the current round. When every player has passed, all dice return, reroll, and the next round begins.',
+    tip: 'You cannot act again after passing, even while one or more CPU rivals keep playing.',
   },
   {
     anchor: 'menu',

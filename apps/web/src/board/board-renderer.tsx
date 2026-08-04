@@ -292,6 +292,9 @@ export function BoardRenderer(props: BoardRendererProps) {
   const appRef = useRef<Application | null>(null);
   const worldRef = useRef<Container | null>(null);
   const locationCardsRef = useRef<Container[]>([]);
+  const tacticalLayersRef = useRef(
+    new Map<LocationId, { layer: Container; restingAlpha: number }>(),
+  );
   const mapTextureRef = useRef<Texture | null>(null);
   const pulseRef = useRef<(() => void) | null>(null);
   const hoverRef = useRef(props.onHoverLocation);
@@ -349,6 +352,12 @@ export function BoardRenderer(props: BoardRendererProps) {
     });
   };
 
+  const setLocationEmphasis = (locationId: LocationId, emphasized: boolean) => {
+    const tactical = tacticalLayersRef.current.get(locationId);
+    if (tactical) tactical.layer.alpha = emphasized ? 1 : tactical.restingAlpha;
+    hoverRef.current(emphasized ? locationId : null);
+  };
+
   useEffect(() => {
     let cancelled = false;
     const app = new Application();
@@ -395,6 +404,7 @@ export function BoardRenderer(props: BoardRendererProps) {
     const app = appRef.current;
     const mapTexture = mapTextureRef.current;
     if (!app || !mapTexture || !ready) return;
+    const tacticalLayers = tacticalLayersRef.current;
     if (pulseRef.current) app.ticker.remove(pulseRef.current);
     for (const child of app.stage.removeChildren())
       child.destroy({ children: true });
@@ -404,6 +414,7 @@ export function BoardRenderer(props: BoardRendererProps) {
     world.position.set(camera.x, camera.y);
     worldRef.current = world;
     locationCardsRef.current = [];
+    tacticalLayers.clear();
     app.stage.addChild(world);
     drawBackdrop(world, mapTexture);
     // A faint ley-line network gives the painted map a strategic skeleton.
@@ -541,6 +552,23 @@ export function BoardRenderer(props: BoardRendererProps) {
       ).length;
       const full =
         isActive && openSlots.length > 0 && occupied >= openSlots.length;
+      const tacticalRestingAlpha = pinned
+        ? 1
+        : props.selectedDieId
+          ? legal
+            ? 1
+            : 0.28
+          : occupied > 0
+            ? 0.78
+            : isActive
+              ? 0.52
+              : 0.64;
+      const tacticalLayer = new Container();
+      tacticalLayer.alpha = tacticalRestingAlpha;
+      tacticalLayers.set(location.id, {
+        layer: tacticalLayer,
+        restingAlpha: tacticalRestingAlpha,
+      });
       const card = new Container();
       card.pivot.set(CARD_WIDTH / 2, CARD_HEIGHT / 2);
       card.position.set(point.x + CARD_WIDTH / 2, point.y + CARD_HEIGHT / 2);
@@ -567,12 +595,14 @@ export function BoardRenderer(props: BoardRendererProps) {
       });
       card.on('pointerover', () => {
         hoverRef.current(location.id);
+        tacticalLayer.alpha = 1;
         if (!props.reducedMotion && isActive) {
           aura.alpha = Math.min(0.5, aura.alpha + 0.13);
         }
       });
       card.on('pointerout', () => {
         hoverRef.current(null);
+        tacticalLayer.alpha = tacticalRestingAlpha;
         aura.alpha = !isActive
           ? 0.03
           : legal
@@ -695,6 +725,8 @@ export function BoardRenderer(props: BoardRendererProps) {
         }
       }
 
+      card.addChild(tacticalLayer);
+
       // Active destinations share one neutral landing rail. Legality belongs
       // to the actual slot, not a large outline around the whole location.
       // Sealed regions deliberately stay compact so the map art can breathe.
@@ -703,7 +735,7 @@ export function BoardRenderer(props: BoardRendererProps) {
           .roundRect(34, 108, 182, 111, 13)
           .fill({ color: 0x090b0b, alpha: 0.72 })
           .stroke({ color: 0x8d7049, width: 1.5, alpha: 0.68 });
-        card.addChild(placementRail);
+        tacticalLayer.addChild(placementRail);
       }
 
       const plaque = new Graphics()
@@ -741,7 +773,7 @@ export function BoardRenderer(props: BoardRendererProps) {
         },
       });
       rewards.position.set(50, 138);
-      card.addChild(rewards);
+      tacticalLayer.addChild(rewards);
 
       if (!isActive) {
         const sealedRail = new Graphics()
@@ -760,7 +792,7 @@ export function BoardRenderer(props: BoardRendererProps) {
         });
         sealedRailText.anchor.set(0.5);
         sealedRailText.position.set(CARD_WIDTH / 2, SLOT_Y + 12);
-        card.addChild(sealedRail, sealedRailText);
+        tacticalLayer.addChild(sealedRail, sealedRailText);
       } else {
         location.slots.forEach((slot, slotIndex) => {
           const slotRowWidth =
@@ -793,7 +825,7 @@ export function BoardRenderer(props: BoardRendererProps) {
             });
             sealed.anchor.set(0.5);
             sealed.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y);
-            card.addChild(die, sealed);
+            tacticalLayer.addChild(die, sealed);
           } else if (slot.occupantDieId) {
             const human = slot.occupantPlayerId === props.humanPlayerId;
             const occupantPlayer = slot.occupantPlayerId
@@ -816,7 +848,7 @@ export function BoardRenderer(props: BoardRendererProps) {
                 width: slotBumpable ? 3 : 2,
                 alpha: 0.58,
               });
-            card.addChild(landingRing);
+            tacticalLayer.addChild(landingRing);
             if (slotBumpable || occupantRaidDamage !== null) {
               pulseTargets.push(landingRing);
             }
@@ -892,7 +924,7 @@ export function BoardRenderer(props: BoardRendererProps) {
             });
             owner.anchor.set(0.5);
             owner.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y + 13);
-            card.addChild(
+            tacticalLayer.addChild(
               die,
               pipFallbackValue,
               valueBadge,
@@ -915,7 +947,7 @@ export function BoardRenderer(props: BoardRendererProps) {
                   width: slotRecommended ? 4 : 3,
                   alpha: 0.76,
                 });
-              card.addChild(targetRing);
+              tacticalLayer.addChild(targetRing);
               pulseTargets.push(targetRing);
             }
             die
@@ -953,7 +985,7 @@ export function BoardRenderer(props: BoardRendererProps) {
             });
             requirement.anchor.set(0.5);
             requirement.position.set(x + SLOT_SIZE / 2, SLOT_CENTER_Y);
-            card.addChild(die, requirement);
+            tacticalLayer.addChild(die, requirement);
             if (slotLegal) {
               const landCue = new Text({
                 text: slotRecommended ? 'LAND ★' : 'LAND',
@@ -968,7 +1000,7 @@ export function BoardRenderer(props: BoardRendererProps) {
               });
               landCue.anchor.set(0.5);
               landCue.position.set(x + SLOT_SIZE / 2, SLOT_Y - 11);
-              card.addChild(landCue);
+              tacticalLayer.addChild(landCue);
             }
           }
           if (slotRecommended) pulseTargets.push(die);
@@ -982,7 +1014,7 @@ export function BoardRenderer(props: BoardRendererProps) {
         });
         occupancy.anchor.set(0.5);
         occupancy.position.set(CARD_WIDTH / 2, 211);
-        card.addChild(occupancy);
+        tacticalLayer.addChild(occupancy);
       }
       world.addChild(card);
       locationCardsRef.current.push(card);
@@ -1004,7 +1036,10 @@ export function BoardRenderer(props: BoardRendererProps) {
     return () => {
       app.ticker.remove(pulse);
       if (worldRef.current === world) worldRef.current = null;
-      if (worldRef.current === null) locationCardsRef.current = [];
+      if (worldRef.current === null) {
+        locationCardsRef.current = [];
+        tacticalLayers.clear();
+      }
     };
   }, [
     props.game,
@@ -1242,10 +1277,10 @@ export function BoardRenderer(props: BoardRendererProps) {
                 }
                 pinRef.current(location.id);
               }}
-              onBlur={() => hoverRef.current(null)}
-              onFocus={() => hoverRef.current(location.id)}
-              onMouseEnter={() => hoverRef.current(location.id)}
-              onMouseLeave={() => hoverRef.current(null)}
+              onBlur={() => setLocationEmphasis(location.id, false)}
+              onFocus={() => setLocationEmphasis(location.id, true)}
+              onMouseEnter={() => setLocationEmphasis(location.id, true)}
+              onMouseLeave={() => setLocationEmphasis(location.id, false)}
               style={cameraHotspotStyle(point, cameraState.scale)}
               title={
                 props.selectedDieId
