@@ -4900,77 +4900,96 @@ select {
   color: #ffdda4;
 }
 
-/* A die that is mid-roll should read as tumbling, not as a changing label. */
+/* A fresh roll is one tabletop throw and settle. The pieces do not loop or
+   rattle in place; small per-die offsets keep the tray from moving in lockstep. */
 .die.rolling {
-  animation: die-tumble 220ms cubic-bezier(0.42, 0, 0.58, 1) infinite;
-  filter: brightness(1.18) saturate(1.18);
-  transform-origin: 50% 72%;
+  animation: die-roll-settle 520ms cubic-bezier(0.2, 0.72, 0.28, 1)
+    var(--roll-delay, 0ms) both;
+  filter: brightness(1.08) saturate(1.08);
+  transform-origin: 50% 78%;
+  will-change: transform;
 }
 .die.rolling > strong {
   color: #ffe6ad;
-  animation: die-value-flicker 110ms steps(2, end) infinite;
+  animation: die-value-settle 520ms ease-out var(--roll-delay, 0ms) both;
 }
 .die.rolling .die-art {
-  animation: die-art-tumble 440ms cubic-bezier(0.32, 0.72, 0.28, 1) infinite;
+  animation: die-art-roll 520ms cubic-bezier(0.2, 0.72, 0.28, 1)
+    var(--roll-delay, 0ms) both;
 }
 .die-roll-flare {
   position: absolute;
   z-index: 3;
-  inset: -0.45rem;
-  border: 2px solid color-mix(in srgb, var(--die-glow) 72%, white);
+  inset: -0.18rem;
+  border: 1px solid color-mix(in srgb, var(--die-glow) 58%, white);
   border-radius: 0.7rem;
   opacity: 0;
   pointer-events: none;
-  animation: die-roll-flare 440ms ease-out infinite;
+  animation: die-landing-glint 520ms ease-out var(--roll-delay, 0ms) both;
 }
-@keyframes die-tumble {
+@keyframes die-roll-settle {
   0% {
-    transform: rotate(-10deg) translateY(0) scale(1.04);
+    transform: translateX(0) translateY(1px) rotate(0deg) scale(0.97);
   }
-  25% {
-    transform: rotate(12deg) translateY(-5px) scale(1.1);
+  24% {
+    transform: translateX(var(--roll-drift, 0)) translateY(-6px)
+      rotate(var(--roll-angle, 3deg)) scale(1.035);
   }
-  50% {
-    transform: rotate(-8deg) translateY(2px) scale(0.98);
+  52% {
+    transform: translateX(0) translateY(0) rotate(-1deg) scale(1.015);
   }
-  75% {
-    transform: rotate(8deg) translateY(-4px) scale(1.08);
+  72% {
+    transform: translateX(0) translateY(-2px) rotate(0.6deg) scale(1.008);
+  }
+  88% {
+    transform: translateX(0) translateY(0) rotate(-0.25deg) scale(1.002);
   }
   100% {
-    transform: rotate(-10deg) translateY(0) scale(1.04);
+    transform: translateX(0) translateY(0) rotate(0deg) scale(1);
   }
 }
-@keyframes die-art-tumble {
+@keyframes die-art-roll {
   0% {
     transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg) scale(1);
   }
-  50% {
-    transform: rotateX(16deg) rotateY(-12deg) rotateZ(8deg) scale(1.12);
+  28% {
+    transform: rotateX(9deg) rotateY(-7deg) rotateZ(4deg) scale(1.045);
+  }
+  58% {
+    transform: rotateX(-3deg) rotateY(2deg) rotateZ(-1deg) scale(1.012);
   }
   100% {
     transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg) scale(1);
   }
 }
-@keyframes die-value-flicker {
-  0%,
-  100% {
-    opacity: 0.72;
+@keyframes die-value-settle {
+  0% {
+    opacity: 0.58;
+    transform: translateY(-1px) scale(0.94);
   }
-  50% {
+  58% {
+    opacity: 0.78;
+  }
+  100% {
     opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
-@keyframes die-roll-flare {
+@keyframes die-landing-glint {
   0% {
     opacity: 0;
-    transform: scale(0.72) rotate(-10deg);
+    transform: scale(0.92);
   }
-  35% {
-    opacity: 0.82;
+  58% {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  76% {
+    opacity: 0.42;
   }
   100% {
     opacity: 0;
-    transform: scale(1.16) rotate(8deg);
+    transform: scale(1.06);
   }
 }
 .reduced-motion .die.rolling {
@@ -5508,7 +5527,23 @@ select {
 }
 
 .game-shell .decision-dock {
+  position: absolute;
+  z-index: 45;
+  right: 0.8rem;
+  left: auto;
   bottom: 8.15rem;
+}
+
+.game-shell .decision-dock-instruction {
+  padding: 0.45rem 0.55rem;
+  border-left: 2px solid rgb(222 176 92 / 75%);
+  border-radius: 0.15rem 0.4rem 0.4rem 0.15rem;
+  color: #d7c6a7;
+  background: rgb(222 176 92 / 8%);
+}
+
+.game-shell .decision-slot.idle {
+  min-height: 3.25rem;
 }
 
 .game-shell .pressure-panel.is-open,
@@ -5611,6 +5646,9 @@ select {
 
   .game-shell .hand-dock,
   .game-shell .decision-dock {
+    position: absolute;
+    right: 0.7rem;
+    left: auto;
     bottom: 0.7rem;
   }
 }
@@ -6503,6 +6541,7 @@ select {
   .game-shell .player-strip {
     position: absolute;
     z-index: 35;
+    grid-row: auto;
     top: 4.15rem;
     left: 50%;
     width: min(52rem, calc(100% - 34rem));
@@ -6630,6 +6669,10 @@ select {
     bottom: 0.65rem;
   }
 
+  .game-shell .board-zoom-controls {
+    top: 4.35rem;
+  }
+
   .game-shell .accessible-actions {
     bottom: calc(100% + 0.4rem);
   }
@@ -6662,7 +6705,9 @@ select {
     bottom: auto;
     left: 50%;
     width: min(76rem, calc(100vw - 3rem));
-    max-height: min(42rem, calc(100dvh - 7rem));
+    height: min(22rem, calc(100dvh - 3rem));
+    min-height: 0;
+    max-height: calc(100dvh - 3rem);
     margin: 0;
     overflow: auto;
     box-shadow:
@@ -6689,9 +6734,110 @@ select {
     width: min(44rem, calc(100% - 8rem));
   }
 
+  .game-shell .player {
+    min-height: 2.35rem;
+    padding-block: 0.2rem;
+  }
+
+  .game-shell .player-identity > .resources {
+    display: none;
+  }
+
+  .game-shell .player-score > strong {
+    font-size: 1.15rem;
+  }
+
+  .game-shell .board-zoom-controls {
+    display: none;
+  }
+
   .game-shell .dice-panel,
   .game-shell.table-focus .dice-panel {
     grid-template-columns: minmax(22rem, auto) minmax(17rem, 1fr);
     max-height: none;
+  }
+
+  .game-shell .hand-dock {
+    grid-template-columns: 10rem minmax(0, 1fr);
+    grid-template-rows: 1fr;
+    min-height: 4.65rem;
+    max-height: 4.65rem;
+  }
+
+  .game-shell .hand-dock-heading {
+    padding: 0.2rem 0.55rem;
+    border-right: 1px solid rgb(255 255 255 / 8%);
+    border-bottom: 0;
+  }
+
+  .game-shell .hand-dock-heading > div {
+    display: block;
+  }
+
+  .game-shell .hand-dock-card {
+    min-height: 3.75rem;
+    max-height: 3.75rem;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 820px) {
+  .game-shell .card-panel.is-open {
+    top: 50%;
+    right: auto;
+    bottom: auto;
+    left: 50%;
+    width: calc(100vw - 2rem);
+    height: min(22rem, calc(100dvh - 3rem));
+    min-height: 0;
+    max-height: calc(100dvh - 3rem);
+    transform: translate(-50%, -50%);
+  }
+
+  .game-shell .dice-panel,
+  .game-shell.table-focus .dice-panel {
+    display: grid;
+    grid-template-columns: minmax(22rem, 1.1fr) minmax(18rem, 1fr);
+    gap: 0.45rem;
+    padding: 0.45rem;
+    overflow: hidden;
+  }
+
+  .game-shell .player-pieces {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .game-shell .turn-summary {
+    grid-column: 2;
+    grid-row: 1;
+    min-height: 0;
+  }
+
+  .game-shell .hand-dock {
+    display: none;
+  }
+
+  .game-shell .dice-panel:has(.turn-summary.is-armed) .turn-summary {
+    display: none;
+  }
+
+  .game-shell.is-inspecting
+    .dice-panel:has(.turn-summary.is-armed)
+    .turn-summary {
+    display: grid;
+  }
+
+  .game-shell .dice-panel:has(.turn-summary.is-armed) .move-advisor,
+  .game-shell .dice-panel:has(.turn-summary.is-armed) .move-advisor.empty {
+    grid-column: 2;
+    grid-row: 1;
+    width: 100%;
+    height: 7rem;
+    max-height: 7rem;
+    overflow: auto hidden;
+  }
+
+  .game-shell .placement-guide {
+    display: none;
   }
 }

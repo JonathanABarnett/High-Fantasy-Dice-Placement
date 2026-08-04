@@ -61,8 +61,8 @@ const STEPS: readonly TutorialStep[] = [
     eyebrow: 'Plan before committing',
     title: 'Pin a location for full details',
     symbol: '☰',
-    body: 'Click any location without placing to pin its contextual drawer. That drawer enlarges its reward, requirements, occupants, encounters, and the exact reason each slot is playable, blocked, full, or bumpable.',
-    tip: 'Only one decision layer is shown at a time. Pinning a location dismisses the route advisor so the board never becomes a stack of windows.',
+    body: 'Click any location without placing to pin its contextual drawer. It first presents the reward and slot requirements at a glance; choose a die and those slots immediately resolve to playable, blocked, full, or bumpable.',
+    tip: 'The pinned plaque and drawer replace oversized map effects. On compact tables, your armed-die summary stays in the command rail while the drawer handles slot details.',
   },
   {
     anchor: 'momentum',
@@ -77,8 +77,8 @@ const STEPS: readonly TutorialStep[] = [
     eyebrow: 'Schemes in reach',
     title: 'Play directly from your hand',
     symbol: '✦',
-    body: 'Your hand occupies the center bay of the command rail. Play a visible card directly or choose Manage for the larger hand-and-market drawer. When you select a die, this same bay becomes a compact list of its best routes.',
-    tip: 'Some cards require a ready die as their target. Select that die before playing the card, then return to Cards when you are ready to cast it.',
+    body: 'On wider tables, your hand occupies the center bay of the command rail and becomes a compact route list when you select a die. On compact tables, Cards opens the same hand in a focused modal so the board and dice stay readable.',
+    tip: 'Some cards require a ready die as their target. Select that die before opening Cards when you are ready to cast it.',
   },
   {
     anchor: 'drawers',

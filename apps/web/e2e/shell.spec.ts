@@ -145,9 +145,33 @@ test('keeps the realm full-width at the compact table breakpoint', async ({
 
   const boardBox = await page.getByTestId('pixi-board').boundingBox();
   expect(boardBox?.width ?? 0).toBeGreaterThan(700);
-  await expect(
-    page.getByRole('region', { name: 'Your card hand' }),
-  ).toBeVisible();
+  await expect(page.locator('.hand-dock')).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Cards' })).toBeVisible();
+
+  const tray = await page.locator('.dice-panel').boundingBox();
+  await page.locator('.die:not([disabled])').first().click();
+  await expect(page.locator('.turn-summary')).toBeHidden();
+  const advisor = await page.locator('.move-advisor').boundingBox();
+  expect(advisor).not.toBeNull();
+  expect(tray).not.toBeNull();
+  expect(advisor!.x).toBeGreaterThanOrEqual(tray!.x);
+  expect(advisor!.x + advisor!.width).toBeLessThanOrEqual(
+    tray!.x + tray!.width,
+  );
+  expect(advisor!.y).toBeGreaterThanOrEqual(tray!.y);
+  expect(advisor!.y + advisor!.height).toBeLessThanOrEqual(
+    tray!.y + tray!.height,
+  );
+
+  await page.locator('.die[aria-pressed="true"]').click();
+  await expect(page.locator('.turn-summary')).toBeVisible();
+  await page.locator('.panel-shortcut').filter({ hasText: 'Cards' }).click();
+  const cards = page.getByRole('region', { name: 'Card hand and market' });
+  await expect(cards).toBeVisible();
+  const cardsBox = await cards.boundingBox();
+  expect(cardsBox).not.toBeNull();
+  expect(cardsBox!.height).toBeLessThan(page.viewportSize()!.height * 0.75);
+  await cards.getByRole('button', { name: 'Close' }).click();
 });
 
 test('keeps the realm playable while using the atlas and compact game menu', async ({

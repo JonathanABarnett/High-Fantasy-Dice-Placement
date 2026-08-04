@@ -580,7 +580,7 @@ export function BoardRenderer(props: BoardRendererProps) {
               ? 0.3
               : 0.07
             : pinned
-              ? 0.16
+              ? 0
               : 0.1;
       });
 
@@ -595,7 +595,7 @@ export function BoardRenderer(props: BoardRendererProps) {
                 ? 0.3
                 : 0.07
               : pinned
-                ? 0.16
+                ? 0
                 : 0.1,
         })
         .stroke({
@@ -606,8 +606,8 @@ export function BoardRenderer(props: BoardRendererProps) {
             : pinned
               ? 0xf1c66f
               : 0xd0a65d,
-          width: legal ? 1 : pinned ? 2 : 1,
-          alpha: legal ? 0 : isActive ? 0.42 : 0.2,
+          width: 1,
+          alpha: legal || pinned ? 0 : isActive ? 0.42 : 0.2,
         });
       card.addChild(aura);
 
@@ -631,20 +631,13 @@ export function BoardRenderer(props: BoardRendererProps) {
             : legal
               ? 0
               : pinned
-                ? 0.95
+                ? 0
                 : isActive
                   ? 0.12
                   : 0.35,
         });
       if (legal && recommended) pulseTargets.push(highlight);
       card.addChild(highlight);
-      if (pinned) {
-        card.addChild(
-          new Graphics()
-            .ellipse(CARD_WIDTH / 2, CARD_HEIGHT / 2, 98, 80)
-            .stroke({ color: 0xf1c66f, width: 4, alpha: 0.96 }),
-        );
-      }
       if (!isActive || (props.selectedDieId && !legal)) {
         card.addChild(
           new Graphics()
@@ -717,9 +710,9 @@ export function BoardRenderer(props: BoardRendererProps) {
         .roundRect(41, 116, 168, 38, 10)
         .fill({ color: 0x130f0d, alpha: 0.88 })
         .stroke({
-          color: recommended ? 0xffd36d : 0xd0a65d,
-          width: recommended ? 3 : 2,
-          alpha: recommended ? 0.95 : 0.76,
+          color: recommended || pinned ? 0xffd36d : 0xd0a65d,
+          width: recommended || pinned ? 3 : 2,
+          alpha: recommended || pinned ? 0.95 : 0.76,
         });
       card.addChild(plaque);
 

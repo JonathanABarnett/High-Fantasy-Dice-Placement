@@ -997,7 +997,7 @@ function CountUp({
 
 /** How long dice tumble before settling on the value the engine rolled. */
 const ROLL_DURATION_MS = 620;
-const ROLL_TICK_MS = 60;
+const ROLL_TICK_MS = 95;
 
 type GameSoundCue =
   | 'acquire'
@@ -1155,7 +1155,7 @@ function useGameAudio(enabled: boolean) {
 }
 
 /**
- * Cosmetic tumbling for the dice tray. This is a dice game in which the player
+ * Cosmetic tabletop roll for the dice tray. This is a dice game in which the player
  * had never actually seen a die roll — values simply changed between rounds.
  * The faces shown mid-tumble are decoration only and are never read back into
  * game state, so determinism and replays are untouched.
@@ -1528,6 +1528,11 @@ function LocationDecisionDock({
             : `${openSlots.length} open slot${openSlots.length === 1 ? '' : 's'}`}
         </span>
       </div>
+      {!selectedDie && (
+        <p className="decision-dock-instruction">
+          Choose a die below to see which open slot it can claim.
+        </p>
+      )}
       <ul className="decision-slot-list">
         {inspectedLocation.slots.map((slot, index) => {
           const placement: GameAction | null =
@@ -1563,7 +1568,7 @@ function LocationDecisionDock({
             }
           }
           const status = !selectedDie
-            ? 'Inspect'
+            ? null
             : validation?.legal
               ? isBump
                 ? 'Bump'
@@ -1571,23 +1576,21 @@ function LocationDecisionDock({
               : 'Blocked';
           return (
             <li
-              className={`decision-slot ${status.toLowerCase()}`}
+              className={`decision-slot ${status?.toLowerCase() ?? 'idle'}`}
               key={slot.id}
             >
               <strong>{index + 1}</strong>
               <span className="decision-slot-main">
                 <RequirementTokens requirement={slot.requirement} />
-                <b>{status}</b>
+                {status && <b>{status}</b>}
               </span>
-              <em>
-                {!selectedDie
-                  ? 'Select a die to test this square.'
-                  : validation?.legal
-                    ? isBump
-                      ? 'Can bump the rival die here.'
-                      : 'This die can be placed here.'
+              {selectedDie && (!validation?.legal || isBump) && (
+                <em>
+                  {validation?.legal
+                    ? 'Returns the rival die to its owner.'
                     : (validation?.message ?? 'No legal placement here.')}
-              </em>
+                </em>
+              )}
             </li>
           );
         })}
@@ -2604,12 +2607,12 @@ export function App() {
               <p>Select a ready die, then choose a highlighted slot.</p>
               <div className="player-pieces">
                 <div className="dice" data-tutorial="dice">
-                  {human?.dice.map((die) => {
+                  {human?.dice.map((die, dieIndex) => {
                     const affinity = AFFINITY_INFO[die.affinity];
                     const boost = die.valueBonus ?? 0;
                     const settled =
                       die.rolledFaceIndex === null ? '—' : dieValue(die);
-                    // While tumbling, show throwaway faces so the roll reads as
+                    // While rolling, show throwaway faces so the throw reads as
                     // a roll. The settled value is what every rule uses.
                     const value =
                       diceRoll.rolling && die.rolledFaceIndex !== null
@@ -2666,6 +2669,13 @@ export function App() {
                         onDragEnd={() => setDraggingDieId(null)}
                         key={die.id}
                         onClick={() => selectDieForPlanning(die.id)}
+                        style={
+                          {
+                            '--roll-angle': `${[-4, 3, -3, 4, -2][dieIndex % 5]}deg`,
+                            '--roll-delay': `${dieIndex * 18}ms`,
+                            '--roll-drift': `${[-2, 1, -1, 2, 0][dieIndex % 5]}px`,
+                          } as CSSProperties
+                        }
                         type="button"
                       >
                         <span
