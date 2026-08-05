@@ -69,7 +69,7 @@ Placing at Forge Hall unlocks upgrades for the rest of that round. An upgrade pa
 
 Each faction pulls on a different part of the game, so the same board rewards them differently.
 
-- **Arcanum Conclave:** any placement at an Arcane location gains 1 extra mana, or 2 with an Arcane die. They bump rivals by spending 1 mana instead of 1 influence.
+- **Arcanum Conclave:** any placement at an Arcane location gains 1 extra mana. They bump rivals by spending 1 mana instead of 1 influence.
 - **Ember Dominion:** a Martial die at a Martial location gains 1 victory point, and their dice deal 2 extra damage to raid bosses, making them the fastest dragonslayers.
 - **Verdant Covenant:** they field a sixth Nature die. Nature dice reduce minimum-value requirements by 1, to a minimum of 1 — which also lowers a beast's effective threat and so increases overkill loot. They gain 1 influence whenever one of their dice is bumped.
 - **Stonebound League:** placement at Forge Hall gains 1 extra material, and rivals must pay 1 extra influence to bump a Stonebound die.

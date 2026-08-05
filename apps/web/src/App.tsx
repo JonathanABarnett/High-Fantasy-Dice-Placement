@@ -2442,6 +2442,12 @@ export function App() {
                 CPU_DIFFICULTIES.find((tier) => tier.id === difficulty)
                   ?.description
               }
+              {seatCount === 3 && (
+                <span>
+                  Three-player rule: the opening seat begins with +2 gold and +1
+                  influence; initiative mirrors A–B–C–C–B–A across six rounds.
+                </span>
+              )}
             </p>
             <div className="button-row setup-actions">
               <button

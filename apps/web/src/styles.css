@@ -6184,6 +6184,11 @@ select {
   color: #8f8a7d;
   font-size: 0.68rem;
 }
+.setup-difficulty span {
+  display: block;
+  margin-top: 0.28rem;
+  color: #b7a783;
+}
 
 .setup-actions {
   display: grid;

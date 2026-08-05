@@ -10,6 +10,7 @@
     "pnpm": ">=10"
   },
   "scripts": {
+    "audit:three-player": "pnpm --filter @shattered-crown/game-ai audit:three-player",
     "dev": "pnpm --filter @shattered-crown/web dev",
     "build": "pnpm -r --if-present run build",
     "typecheck": "pnpm -r --if-present run typecheck",

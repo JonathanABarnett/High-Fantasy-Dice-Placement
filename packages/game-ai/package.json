@@ -10,6 +10,7 @@
     }
   },
   "scripts": {
+    "audit:three-player": "node scripts/three-player-fairness.mjs",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json"
   },

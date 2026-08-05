@@ -22,7 +22,7 @@ const STEPS: readonly TutorialStep[] = [
     title: 'Claim the Shattered Crown',
     symbol: '♛',
     body: 'You and your CPU rivals have six rounds to build the strongest realm. The compact header keeps the current round, active player, camera controls, and menu visible without shrinking the board. A brief action ribbon summarizes each handoff without stopping play.',
-    tip: 'Most actions spend your turn. Read who acts next before committing a die or card.',
+    tip: 'Most actions spend your turn. In a three-player match, the opening seat gets a small resource purse and initiative mirrors A–B–C–C–B–A across six rounds.',
   },
   {
     anchor: 'players',

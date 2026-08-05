@@ -30,7 +30,7 @@ export const factions = [
     name: 'Arcanum Conclave',
     passiveAbilityId: 'arcane-resonance',
     passiveAbility:
-      'Gain 1 additional mana at any Arcane location, or 2 with an Arcane die, and bump rivals for 1 mana instead of 1 influence.',
+      'Gain 1 additional mana at any Arcane location, and bump rivals for 1 mana instead of 1 influence.',
     roundAbility: 'Begin with Revelation of Stars in hand.',
     startingCardId: cardId('arcanum-starting-card'),
     scoringRule: 'Score 1 point for every 2 mana at the end of the match.',

@@ -57,13 +57,25 @@ test('starts a human-versus-two-CPU match and rotates through every seat', async
   await page.goto('/');
   await page.getByLabel('Players').selectOption('3');
   await expect(page.getByText('3 houses')).toBeVisible();
+  await expect(
+    page.getByText(/opening seat begins with \+2 gold and \+1 influence/i),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Start match' }).click();
 
   const standings = page.locator('.player-strip');
+  const humanStanding = standings.locator('[data-player-id="player-human"]');
   await expect(page.locator('.turn-cue')).toContainText('Round 1 begins');
   await expect(standings.locator('.player')).toHaveCount(3);
   await expect(standings).toContainText('CPU 2');
   await expect(standings).toHaveClass(/player-strip-3/);
+  await expect(humanStanding.locator('.resource-gold')).toHaveAttribute(
+    'aria-label',
+    /^Gold 4\./,
+  );
+  await expect(humanStanding.locator('.resource-influence')).toHaveAttribute(
+    'aria-label',
+    /^Influence 2\./,
+  );
 
   await page.locator('.die:not([disabled])').first().click();
   await page

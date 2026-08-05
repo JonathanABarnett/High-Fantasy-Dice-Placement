@@ -380,8 +380,8 @@ describe('headless match', () => {
       (player) => player.id === human.id,
     )!;
     expect(updated.resources.gold).toBe(1);
-    // 1 starting + 2 location reward + 2 Arcanum resonance for an Arcane die.
-    expect(updated.resources.mana).toBe(5);
+    // 1 starting + 2 location reward + 1 Arcanum resonance.
+    expect(updated.resources.mana).toBe(4);
     expect(updated.victoryPoints).toBe(1);
     expect(result.events.map((event) => event.sequence)).toEqual(
       [...result.events.map((event) => event.sequence)].sort((a, b) => a - b),
@@ -1527,6 +1527,35 @@ describe('headless match', () => {
     expect(state.round.number).toBe(2);
     expect(state.result).not.toBeNull();
     expect(state.result?.winnerIds.length).toBeGreaterThan(0);
+  });
+
+  it('mirrors three-player initiative so every seat opens early and late', () => {
+    let state = createGame({
+      seed: 'three-player-initiative-test',
+      humanFactionId: factions[0]!.id,
+      cpuFactionId: factions[1]!.id,
+      additionalCpuFactionIds: [factions[0]!.id],
+      content: { factions, locations, cards, upgrades },
+    }).state;
+    const openingSeats: number[] = [];
+    let observedRound = 0;
+
+    while (state.phase !== 'complete') {
+      if (state.round.number !== observedRound) {
+        observedRound = state.round.number;
+        openingSeats.push(
+          state.players.findIndex(
+            (player) => player.id === state.round.firstPlayerId,
+          ),
+        );
+      }
+      state = applyAction(state, {
+        type: 'pass',
+        playerId: state.turn.activePlayerId,
+      }).state;
+    }
+
+    expect(openingSeats).toEqual([0, 1, 2, 2, 1, 0]);
   });
 
   it('round-trips saves and rejects invalid schemas', () => {

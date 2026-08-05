@@ -59,6 +59,11 @@ const ARCANE_BUMP_COST: Partial<ResourcePool> = { mana: 1 };
 const EMBER_RAID_BONUS = 2;
 /** Extra influence demanded to shift a Stonebound die. */
 const STONEBOUND_BUMP_TAX: Partial<ResourcePool> = { influence: 1 };
+/** Tempo compensation for the opening seat in a three-player match. */
+const THREE_PLAYER_FIRST_SEAT_PURSE: Partial<ResourcePool> = {
+  gold: 2,
+  influence: 1,
+};
 
 /**
  * Victory points for extending a themed run of placements, by run length.
@@ -452,7 +457,7 @@ export function createGame(options: CreateGameOptions): TransitionResult {
       throw new Error('Every CPU faction must exist in match content.');
     return faction;
   });
-  const players = [
+  const seatedPlayers = [
     createPlayer(humanId, 'Player', 'human', humanFaction),
     ...cpuFactions.map((faction, index) =>
       createPlayer(
@@ -463,6 +468,21 @@ export function createGame(options: CreateGameOptions): TransitionResult {
       ),
     ),
   ];
+  const players =
+    seatedPlayers.length === 3
+      ? seatedPlayers.map((player, seat) =>
+          seat === 0
+            ? {
+                ...player,
+                resources: adjustResources(
+                  player.resources,
+                  THREE_PLAYER_FIRST_SEAT_PURSE,
+                  1,
+                ),
+              }
+            : player,
+        )
+      : seatedPlayers;
   const roundLocations = configureRoundScarcity(
     options.content.locations,
     random,
@@ -1086,6 +1106,35 @@ function scoreMatch(state: GameState): MatchResult {
   };
 }
 
+/**
+ * Multi-player initiative runs out and then back across the table when the
+ * match has two rounds per seat. A simple endless clockwise rotation gives
+ * the final-round opening move to the seat that already benefited from acting
+ * later through the early game. The mirrored order (A-B-C-C-B-A) gives every
+ * seat one early and one late opening without changing two-player tempo.
+ */
+function nextRoundFirstPlayer(state: GameState): PlayerState {
+  const nextRound = state.round.number + 1;
+  if (
+    state.players.length >= 3 &&
+    state.round.maximum === state.players.length * 2
+  ) {
+    const outwardIndex = nextRound - 1;
+    const mirroredIndex =
+      outwardIndex < state.players.length
+        ? outwardIndex
+        : state.round.maximum - nextRound;
+    return state.players[mirroredIndex] as PlayerState;
+  }
+
+  const firstPlayerIndex = state.players.findIndex(
+    (player) => player.id === state.round.firstPlayerId,
+  );
+  return state.players[
+    (firstPlayerIndex + 1) % state.players.length
+  ] as PlayerState;
+}
+
 function finishOrStartRound(state: GameState): TransitionResult {
   if (state.round.number >= state.round.maximum) {
     const preliminary = { ...state, phase: 'scoring' as const };
@@ -1103,12 +1152,7 @@ function finishOrStartRound(state: GameState): TransitionResult {
   }
 
   const nextRound = state.round.number + 1;
-  const firstPlayerIndex = state.players.findIndex(
-    (player) => player.id === state.round.firstPlayerId,
-  );
-  const nextFirst = state.players[
-    (firstPlayerIndex + 1) % state.players.length
-  ] as PlayerState;
+  const nextFirst = nextRoundFirstPlayer(state);
   const random = new SeededRandom({
     algorithm: 'xorshift32',
     state: state.rngState,
@@ -1572,7 +1616,7 @@ export function applyAction(
       actingPlayer.factionAbilityId === 'arcane-resonance' &&
       location.tags.includes('arcane')
     )
-      bonus.mana = (bonus.mana ?? 0) + (die.affinity === 'arcane' ? 2 : 1);
+      bonus.mana = (bonus.mana ?? 0) + 1;
     if (
       actingPlayer.factionAbilityId === 'stonebound-craft' &&
       location.tags.includes('forge')
