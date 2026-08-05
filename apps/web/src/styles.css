@@ -6718,7 +6718,7 @@ select {
 
   .game-shell .pixi-board,
   .game-shell.table-focus .pixi-board {
-    width: min(100%, calc((100dvh - 12rem) * 1.5));
+    width: min(100%, calc((100dvh - 13rem) * 1.5));
     height: auto;
     max-height: 100%;
     box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 48%);
@@ -6745,10 +6745,10 @@ select {
       );
     justify-self: center;
     width: min(90rem, 100%);
-    min-height: 8rem;
-    max-height: 8.2rem;
-    padding: 0.48rem 0.58rem 0.68rem;
-    overflow: hidden;
+    min-height: 9rem;
+    max-height: none;
+    padding: 0.65rem 0.75rem 0.8rem;
+    overflow: visible;
     border-color: rgb(255 255 255 / 10%);
     border-radius: 0.85rem;
     background: rgb(7 10 11 / 94%);
@@ -6757,8 +6757,8 @@ select {
   }
 
   .game-shell .hand-dock-card {
-    min-height: 4.25rem;
-    max-height: 4.25rem;
+    min-height: 4.55rem;
+    max-height: 4.55rem;
   }
 
   .game-shell .hand-dock {
@@ -6775,14 +6775,28 @@ select {
   .game-shell .dice-panel:has(.turn-summary.is-armed) .move-advisor,
   .game-shell .dice-panel:has(.turn-summary.is-armed) .move-advisor.empty {
     box-sizing: border-box;
-    height: 7rem;
+    height: 7.8rem;
     min-height: 0;
-    max-height: 7rem;
+    max-height: 7.8rem;
     overflow: auto hidden;
   }
 
   .game-shell .turn-summary {
     min-height: 0;
+    padding: 0.45rem 0.55rem;
+  }
+
+  .game-shell .player-pieces {
+    gap: 0.4rem;
+    padding-inline: 0.15rem;
+  }
+
+  .game-shell .dice {
+    gap: 0.6rem;
+  }
+
+  .game-shell .panel-shortcuts {
+    gap: 0.4rem;
   }
 
   .game-shell .atlas-nav {
